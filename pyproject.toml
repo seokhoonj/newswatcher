@@ -1,0 +1,79 @@
+[build-system]
+requires      = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name            = "newswatch"
+version         = "0.1.0"
+description     = "Collect topic-matched articles from RSS and robots-permitted crawl sources, summarize them, and mail a digest."
+readme          = "README.md"
+license         = "MIT"
+license-files   = ["LICENSE"]
+authors         = [{ name = "seokhoonj", email = "seokhoonj@gmail.com" }]
+keywords        = ["news", "rss", "crawl", "watch", "digest", "topics", "email"]
+classifiers     = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Internet",
+    "Topic :: Communications :: Email",
+]
+requires-python = ">=3.11"
+dependencies    = [
+    "beautifulsoup4>=4.12",
+    "feedparser>=6.0",
+    "lxml>=5.0",
+    "mailmail>=0.2",
+    "requests>=2.31",
+    "thinchat>=0.1,<0.2",
+    "trafilatura>=1.8",
+]
+
+[project.urls]
+Homepage   = "https://github.com/seokhoonj/newswatch"
+Repository = "https://github.com/seokhoonj/newswatch"
+Issues     = "https://github.com/seokhoonj/newswatch/issues"
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.11",
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "types-requests",
+]
+
+[project.scripts]
+newswatch = "newswatch.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/newswatch"]
+
+[tool.ruff]
+line-length    = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "tests"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = true
+
+# Third-party packages without type stubs.
+[[tool.mypy.overrides]]
+module = ["feedparser", "trafilatura", "bs4"]
+ignore_missing_imports = true
