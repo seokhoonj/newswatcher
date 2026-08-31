@@ -68,6 +68,18 @@ def test_install_rejects_non_representable_interval(monkeypatch):
         install_poll(1500)   # 25h -- not a simple cron step
 
 
+def test_install_rejects_non_divisor_intervals(monkeypatch):
+    # A cron */step restarts at the field's zero each hour/day, so a non-divisor
+    # mis-fires: */45 fires :00,:45 (45-then-15); 0 */5 fires h0,5,10,15,20 then a 4h gap.
+    _fake_crontab(monkeypatch)
+    with pytest.raises(ScheduleError):
+        install_poll(45)     # does not divide 60 minutes
+    with pytest.raises(ScheduleError):
+        install_poll(300)    # 5h -- does not divide 24 hours
+    with pytest.raises(ScheduleError):
+        install_poll(2880)   # 2 days -- day-of-month stepping is irregular across months
+
+
 def _marker_lines(store):
     from newswatch.schedule import _MARKER
     return [ln for ln in store["lines"] if _MARKER in ln]

@@ -64,28 +64,38 @@ def install_poll(every_minutes: int) -> str:
 
 
 def _cron_time_spec(every_minutes: int) -> str:
-    """The 5-field cron time spec that fires every ``every_minutes``. cron step fields
-    are per-unit (minute 0-59, hour 0-23, day-of-month 1-31), so an interval is
-    expressible only as a sub-hour minute step, a whole number of hours below a day, or
-    a whole number of days. A step that overflows its field silently collapses --
-    ``*/120`` in the minute field fires only at minute 0, i.e. hourly -- so reject an
-    interval that does not fit rather than mis-schedule it.
+    """The 5-field cron time spec that fires every ``every_minutes`` at a *regular*
+    cadence. A cron ``*/step`` restarts at its field's zero each hour (minute) or day
+    (hour), so a step that does not divide its field mis-fires: ``*/45`` fires at :00 and
+    :45 (a 45-then-15 cadence), ``0 */5`` fires at hours 0,5,10,15,20 then a 4h gap, and
+    day-of-month stepping is irregular across months of differing length. Only an interval
+    that divides evenly is regular, so accept a sub-hour interval dividing 60, a whole
+    number of hours dividing 24, or exactly one day, and reject the rest rather than
+    silently mis-schedule.
 
     Raises:
-        ScheduleError: the interval cannot be expressed as a simple cron step.
+        ScheduleError: the interval does not map to a regular cron schedule.
     """
     if every_minutes < 60:
+        if 60 % every_minutes:
+            raise _irregular(every_minutes)
         return f"*/{every_minutes} * * * *"
     if every_minutes % 60 == 0:
         hours = every_minutes // 60
         if hours < 24:
+            if 24 % hours:
+                raise _irregular(every_minutes)
             return f"0 */{hours} * * *"
-        if hours % 24 == 0 and (days := hours // 24) <= 31:
-            return f"0 0 */{days} * *"
-    raise ScheduleError(
-        f"interval of {every_minutes} minutes is not expressible as a simple cron "
-        f"schedule; use a sub-hour interval, a whole number of hours below 24, or "
-        f"whole days up to 31")
+        if hours == 24:
+            return "0 0 */1 * *"   # daily
+    raise _irregular(every_minutes)
+
+
+def _irregular(every_minutes: int) -> ScheduleError:
+    return ScheduleError(
+        f"interval of {every_minutes} minutes has no regular cron schedule; use a "
+        f"sub-hour interval that divides 60 (e.g. 15, 20, 30), a whole number of hours "
+        f"that divides 24 (e.g. 60, 120, 240, 480), or one day (1440)")
 
 
 def remove_poll() -> bool:
