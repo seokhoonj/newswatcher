@@ -1,11 +1,12 @@
 """Between-run state, keyed by source name: the dedup watermark and the empty-poll
 counter the healer reads.
 
-- ``seen_guid_by_source`` / ``published_by_source`` -- the newest item already
-  collected per source: its guid and its published time. An item is new when its guid
-  differs from the stored one AND its published time is not older than the stored one
-  (so a re-listed old article is not re-collected, while a genuinely newer article
-  is). Losing this re-collects a backlog, so it is written atomically.
+- ``seen_guids_by_source`` -- the recently-collected guids per source, oldest first.
+  An item is new exactly when its guid is not in this set, so dedup is by identity
+  alone: an item is re-collected only if we have genuinely never seen its guid. The
+  set is bounded to ``_SEEN_CAP`` most-recent guids per source (older guids are
+  evicted and would re-collect once if a source re-lists them), so it cannot grow
+  without bound. Losing this re-collects a backlog, so it is written atomically.
 - ``empty_polls_by_source`` -- consecutive polls where a crawl source's listing
   fetched fine but its ``item`` selector matched zero rows. The healer triggers at a
   threshold; a poll that finds rows clears it.
@@ -25,39 +26,32 @@ from newswatch.feed import FeedItem
 
 __all__ = ["State", "read_state", "write_state", "state_path"]
 
-_SEEN_KEY = "seen_guid_by_source"
-_PUBLISHED_KEY = "published_by_source"
+_SEEN_KEY = "seen_guids_by_source"
 _EMPTY_KEY = "empty_polls_by_source"
+_SEEN_CAP = 1024
 
 
 @dataclass
 class State:
-    """newswatch's between-run state. All three maps are mutable; a poll advances them
-    in place and persists once through ``write_state``."""
+    """newswatch's between-run state. Both maps are mutable; a poll advances them in
+    place and persists once through ``write_state``."""
 
-    seen_guid_by_source:   dict[str, str] = field(default_factory=dict)
-    published_by_source:   dict[str, str] = field(default_factory=dict)
-    empty_polls_by_source: dict[str, int] = field(default_factory=dict)
+    seen_guids_by_source:  dict[str, list[str]] = field(default_factory=dict)
+    empty_polls_by_source: dict[str, int]       = field(default_factory=dict)
 
     def is_new(self, source_name: str, item: FeedItem) -> bool:
-        """Whether ``item`` is newer than the source's watermark. New when its guid is
-        unseen and its published time (when both sides have one) is not older than the
-        stored newest."""
-        if item.guid == self.seen_guid_by_source.get(source_name):
-            return False
-        newest = self.published_by_source.get(source_name, "")
-        if newest and item.published and item.published < newest:
-            return False
-        return True
+        """Whether ``item``'s guid has not been collected recently for this source."""
+        return item.guid not in self.seen_guids_by_source.get(source_name, ())
 
     def mark_seen(self, source_name: str, item: FeedItem) -> None:
-        """Advance the source's watermark to ``item`` when it is at least as recent as
-        the stored newest (or the source has no stored time yet)."""
-        newest = self.published_by_source.get(source_name, "")
-        if not newest or not item.published or item.published >= newest:
-            self.seen_guid_by_source[source_name] = item.guid
-            if item.published:
-                self.published_by_source[source_name] = item.published
+        """Record ``item``'s guid as the most-recently-seen for this source, evicting
+        the oldest guids beyond ``_SEEN_CAP``."""
+        seen = self.seen_guids_by_source.setdefault(source_name, [])
+        if item.guid in seen:
+            seen.remove(item.guid)
+        seen.append(item.guid)
+        if len(seen) > _SEEN_CAP:
+            del seen[: len(seen) - _SEEN_CAP]
 
     def note_empty(self, source_name: str) -> int:
         """Increment and return the source's consecutive empty-poll count."""
@@ -100,8 +94,7 @@ def read_state(path: Path | None = None) -> State:
     if not isinstance(parsed, dict):
         return State()
     return State(
-        seen_guid_by_source=_str_pairs(parsed.get(_SEEN_KEY)),
-        published_by_source=_str_pairs(parsed.get(_PUBLISHED_KEY)),
+        seen_guids_by_source=_str_list_pairs(parsed.get(_SEEN_KEY)),
         empty_polls_by_source=_int_pairs(parsed.get(_EMPTY_KEY)),
     )
 
@@ -114,18 +107,21 @@ def write_state(state: State, path: Path | None = None) -> None:
     """
     path = path or state_path()
     payload = {
-        _SEEN_KEY: _sorted(state.seen_guid_by_source),
-        _PUBLISHED_KEY: _sorted(state.published_by_source),
+        _SEEN_KEY: _sorted(state.seen_guids_by_source),
         _EMPTY_KEY: _sorted(state.empty_polls_by_source),
     }
     data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
     write_bytes_atomic(path, data, ConfigError)
 
 
-def _str_pairs(raw: object) -> dict[str, str]:
+def _str_list_pairs(raw: object) -> dict[str, list[str]]:
     if not isinstance(raw, dict):
         return {}
-    return {k: v for k, v in raw.items() if isinstance(k, str) and isinstance(v, str)}
+    out: dict[str, list[str]] = {}
+    for key, value in raw.items():
+        if isinstance(key, str) and isinstance(value, list):
+            out[key] = [g for g in value if isinstance(g, str)]
+    return out
 
 
 def _int_pairs(raw: object) -> dict[str, int]:
