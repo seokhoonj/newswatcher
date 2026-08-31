@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 __all__ = ["PollReport", "poll_sources"]
 
-Summarizer = Callable[..., Summary]
+Summarizer = Callable[[FeedItem, str], Summary]
 
 
 @dataclass(frozen=True, slots=True)

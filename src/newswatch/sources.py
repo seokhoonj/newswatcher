@@ -18,16 +18,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast, get_args
 
 from newswatch import _toml
 from newswatch._atomic import write_text_atomic
 from newswatch.config import config_dir
 from newswatch.errors import SourceError
 
-__all__ = ["Source", "sources_path", "load_sources", "add_source", "update_selectors"]
+__all__ = ["Source", "SourceKind", "sources_path", "load_sources", "add_source",
+           "update_selectors"]
 
-_KINDS = ("rss", "crawl")
+SourceKind = Literal["rss", "crawl"]
+_KINDS: tuple[SourceKind, ...] = get_args(SourceKind)
 # The crawl selector fields, in the order they render; item/title/link are required
 # for a crawl source, date/body_selector are optional.
 _SELECTOR_FIELDS = ("item", "title", "link", "date", "body_selector")
@@ -41,7 +43,7 @@ class Source:
     silently swap the many optional fields."""
 
     name:          str
-    kind:          str = field(default="rss", kw_only=True)
+    kind:          SourceKind = field(default="rss", kw_only=True)
     url:           str = field(default="", kw_only=True)
     topics:        tuple[str, ...] = field(default=(), kw_only=True)
     keep_all:      bool = field(default=False, kw_only=True)
@@ -115,12 +117,15 @@ def _source_from(entry: dict[str, object], path: Path) -> Source:
     if not isinstance(name, str) or not name.strip():
         raise SourceError(f"a [[source]] in {path} is missing 'name'")
     kind = entry.get("kind", "rss")
+    if not isinstance(kind, str) or kind not in _KINDS:
+        raise SourceError(f"source {name!r}: unknown kind {kind!r}; "
+                          f"choose one of {', '.join(_KINDS)}")
     url = entry.get("url")
     if not isinstance(url, str) or not url.strip():
         raise SourceError(f"source {name!r} is missing 'url'")
     source = Source(
         name.strip(),
-        kind=str(kind),
+        kind=kind,
         url=url.strip(),
         topics=_str_tuple(entry.get("topics", ()), name),
         keep_all=_bool(entry.get("keep_all", False), name),

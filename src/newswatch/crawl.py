@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from newswatch.feed import FeedItem, normalize_date
 from newswatch.http import get
@@ -70,15 +70,18 @@ def parse_selector(selector: str) -> tuple[str, str | None]:
     return css, attr
 
 
-def _select_value(row: object, selector: str, *, base: str | None = None) -> str:
+def _select_value(row: Tag, selector: str, *, base: str | None = None) -> str:
     """The text (or attribute) of the first element under ``row`` matching ``selector``,
     "" when none matches. With ``base`` an attribute value is joined onto it (relative
     link -> absolute)."""
     css, attr = parse_selector(selector)
-    found = row.select_one(css)  # type: ignore[attr-defined]
+    found = row.select_one(css)
     if found is None:
         return ""
     if attr is not None:
-        value = (found.get(attr) or "").strip()
+        raw = found.get(attr)
+        if isinstance(raw, list):   # a multi-valued attribute (e.g. class); join it
+            raw = " ".join(raw)
+        value = (raw or "").strip()
         return urljoin(base, value) if base and value else value
-    return str(found.get_text(strip=True))
+    return found.get_text(strip=True)
