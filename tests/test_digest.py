@@ -40,7 +40,7 @@ def test_archive_and_digest_carry_no_body():
 
 
 def test_send_digest_hands_summary_and_link_to_mailmail(monkeypatch):
-    sent = {}
+    sent: dict[str, str] = {}
 
     class _Fake:
         MailmailError = RuntimeError

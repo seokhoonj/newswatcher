@@ -3,8 +3,11 @@ from thinchat.errors import ThinchatError
 
 import newswatch.heal as heal
 from newswatch.errors import HealError
+from newswatch.robots import RobotsGate
 from newswatch.sources import Source, add_source, load_sources
 from newswatch.state import State
+
+_GATE = RobotsGate("newswatch-test", lambda url: None)   # heal_source is stubbed, gate unused
 
 
 def test_heal_error_hides_key(monkeypatch):
@@ -82,7 +85,7 @@ def test_heal_empty_sources_clears_counter_on_apply(monkeypatch):
     applied = heal.HealResult(source_name="무RSS", old={}, new={"item": "x"},
                               applied=True, note="repaired")
     monkeypatch.setattr(heal, "heal_source", lambda *a, **k: applied)
-    notes = heal.heal_empty_sources((BROKEN,), gate=None, state=st)
+    notes = heal.heal_empty_sources((BROKEN,), gate=_GATE, state=st)
     assert notes == ("repaired",)
     assert "무RSS" not in st.empty_polls_by_source   # counter cleared
 
@@ -96,6 +99,6 @@ def test_heal_empty_sources_reports_failure_without_aborting(monkeypatch):
         raise HealError("nope")
 
     monkeypatch.setattr(heal, "heal_source", _boom)
-    notes = heal.heal_empty_sources((BROKEN,), gate=None, state=st)
+    notes = heal.heal_empty_sources((BROKEN,), gate=_GATE, state=st)
     assert notes and "무RSS" in notes[0]
     assert st.empty_polls_by_source["무RSS"] == 2   # not cleared on failure

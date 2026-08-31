@@ -29,7 +29,7 @@ def test_crawl_delay_is_read():
 def test_throttle_waits_between_fetches_to_a_host():
     # clock reads, in order: record after 1st fetch, wait-calc for 2nd, record after 2nd
     clock = iter([100.0, 101.5, 101.5])
-    slept = []
+    slept: list[float] = []
     gate = RobotsGate("newswatch", _robots("User-agent: *\nCrawl-delay: 2\n"),
                       sleep=slept.append, clock=lambda: next(clock))
     gate.throttle("https://e.com/a")   # first fetch to the host: no wait
@@ -38,7 +38,7 @@ def test_throttle_waits_between_fetches_to_a_host():
 
 
 def test_throttle_does_not_wait_without_crawl_delay():
-    slept = []
+    slept: list[float] = []
     gate = RobotsGate("newswatch", _robots("User-agent: *\nDisallow:\n"),
                       sleep=slept.append)
     gate.throttle("https://e.com/a")

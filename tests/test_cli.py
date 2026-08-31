@@ -160,7 +160,12 @@ def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
     from newswatch.lock import single_instance
     _xdg(monkeypatch, tmp_path)
     ran = []
-    monkeypatch.setattr(cli, "_poll_once", lambda a: ran.append(1) or 0)
+
+    def _poll_once(a):
+        ran.append(1)
+        return 0
+
+    monkeypatch.setattr(cli, "_poll_once", _poll_once)
     with single_instance("poll"):   # stand in for another poll already holding the lock
         assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
     assert ran == []   # the poll body did not run

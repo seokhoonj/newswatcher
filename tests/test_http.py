@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 import requests
 
@@ -28,7 +30,7 @@ def test_get_refuses_disallowed_url_without_requesting():
 
     gate = RobotsGate("ua", lambda url: "User-agent: *\nDisallow: /")
     with pytest.raises(FetchError):
-        http.get("https://e.com/x", gate, session=_Session())
+        http.get("https://e.com/x", gate, session=cast(requests.Session, _Session()))
     assert calls == []   # the disallowed URL was never fetched
 
 
@@ -38,7 +40,7 @@ def test_get_returns_text_when_allowed():
             return _Resp(200, "hello")
 
     gate = RobotsGate("ua", lambda url: None)   # no robots.txt -> allow
-    assert http.get("https://e.com/x", gate, session=_Session()) == "hello"
+    assert http.get("https://e.com/x", gate, session=cast(requests.Session, _Session())) == "hello"
 
 
 def test_get_raises_on_non_2xx():
@@ -48,7 +50,7 @@ def test_get_raises_on_non_2xx():
 
     gate = RobotsGate("ua", lambda url: None)
     with pytest.raises(FetchError):
-        http.get("https://e.com/x", gate, session=_Session())
+        http.get("https://e.com/x", gate, session=cast(requests.Session, _Session()))
 
 
 # --- get() manages the session it creates, and leaves an injected one to its owner ---
@@ -82,7 +84,7 @@ def test_get_closes_a_session_it_created(monkeypatch):
 def test_get_does_not_close_an_injected_session():
     injected = _RecordingSession()
     gate = RobotsGate("ua", lambda url: None)
-    http.get("https://e.com/x", gate, session=injected)
+    http.get("https://e.com/x", gate, session=cast(requests.Session, injected))
     assert injected.closed is False   # the caller owns an injected session
 
 
@@ -102,12 +104,12 @@ def test_get_closes_a_created_session_even_on_request_failure(monkeypatch):
 # --- fetch_robots: RFC 9309 fail-open on 4xx, fail-closed on 5xx / unreachable ---
 
 def test_fetch_robots_4xx_allows(monkeypatch):
-    monkeypatch.setattr(http.requests, "get", lambda *a, **k: _Resp(404, ""))
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp(404, ""))
     assert http.fetch_robots("https://e.com/robots.txt") is None   # None -> gate allows
 
 
 def test_fetch_robots_5xx_disallows(monkeypatch):
-    monkeypatch.setattr(http.requests, "get", lambda *a, **k: _Resp(503, ""))
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _Resp(503, ""))
     text = http.fetch_robots("https://e.com/robots.txt")
     assert text is not None
     gate = RobotsGate("ua", lambda url: text)
@@ -118,14 +120,14 @@ def test_fetch_robots_unreachable_disallows(monkeypatch):
     def boom(*a, **k):
         raise requests.ConnectionError("down")
 
-    monkeypatch.setattr(http.requests, "get", boom)
+    monkeypatch.setattr(requests, "get", boom)
     text = http.fetch_robots("https://e.com/robots.txt")
     gate = RobotsGate("ua", lambda url: text)
     assert gate.can_fetch("https://e.com/anything") is False
 
 
 def test_fetch_robots_200_returns_rules(monkeypatch):
-    monkeypatch.setattr(http.requests, "get",
+    monkeypatch.setattr(requests, "get",
                         lambda *a, **k: _Resp(200, "User-agent: *\nDisallow: /private"))
     text = http.fetch_robots("https://e.com/robots.txt")
     gate = RobotsGate("ua", lambda url: text)
