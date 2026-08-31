@@ -69,14 +69,14 @@ def poll_sources(
             continue
         if source.kind == "crawl":
             state.clear_empty(source.name)
-        for article in _process(source, items, topics, gate, state, store,
-                                session, summarize, skipped):
+        for article in _articles_from(source, items, topics, gate, state, store,
+                                      session, summarize, skipped):
             collected.append(article)
     return PollReport(collected=tuple(collected), empty_crawl_sources=tuple(empty),
                       skipped=tuple(skipped))
 
 
-def _process(
+def _articles_from(
     source: Source, items: tuple[FeedItem, ...], topics: tuple[Topic, ...],
     gate: RobotsGate, state: State, store: FileStore | None,
     session: requests.Session | None, summarize: Summarizer, skipped: list[tuple[str, str]],
