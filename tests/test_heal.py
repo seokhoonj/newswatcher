@@ -1,6 +1,27 @@
+import pytest
+from thinchat.errors import ThinchatError
+
 import newswatch.heal as heal
+from newswatch.errors import HealError
 from newswatch.sources import Source, add_source, load_sources
 from newswatch.state import State
+
+
+def test_heal_error_hides_key(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")
+
+    class _Raising:
+        model = "m"
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def complete(self, prompt, system=None):
+            raise ThinchatError("HTTP 401 at https://gen.../v1?key=SECRET-KEY-123")
+
+    monkeypatch.setattr(heal, "_fetch_listing", lambda s, g, sess: HTML)
+    monkeypatch.setattr(heal, "make_llm_client", lambda *a, **k: _Raising())
+    with pytest.raises(HealError) as excinfo:
+        heal.heal_source(BROKEN, gate=None)
+    assert "SECRET-KEY-123" not in str(excinfo.value)
 
 BROKEN = Source("무RSS", kind="crawl", url="https://e.com/list", topics=("t",),
                 item="ul.OLD li", title="a.old", link="a.old@href")

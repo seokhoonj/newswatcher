@@ -26,7 +26,8 @@ class NewswatchError(Exception):
 
 
 class ConfigError(NewswatchError):
-    """A newswatch config file (settings, topics, or sources) is missing or malformed."""
+    """A newswatch config file (settings, topics, sources, or credentials) is missing or
+    malformed."""
 
 
 class SourceError(NewswatchError):

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from thinchat.errors import ThinchatError
 
-from newswatch._llm import DEFAULT_PROVIDER, make_llm_client
+from newswatch._llm import DEFAULT_PROVIDER, make_llm_client, scrub_secrets
 from newswatch.errors import LLMError
 from newswatch.feed import FeedItem
 
@@ -54,7 +54,7 @@ def summarize_article(
         try:
             text = client.complete(prompt, system=_SYSTEM).strip()
         except ThinchatError as err:
-            raise LLMError(f"summary request failed: {err}") from err
+            raise LLMError(f"summary request failed: {scrub_secrets(str(err))}") from err
     if not text:
         raise LLMError("summary request returned an empty reply")
     return Summary(title=item.title, link=item.link, text=text, model=client.model)
