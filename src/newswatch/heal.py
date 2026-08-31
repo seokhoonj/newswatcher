@@ -124,8 +124,9 @@ def propose_selectors(
     html: str, source: Source, *, provider: str = DEFAULT_PROVIDER,
     model: str | None = None, api_key: str | None = None,
 ) -> dict[str, str]:
-    """Ask an LLM for fresh CSS selectors for ``html``. Returns a map with item/title/
-    link/date keys.
+    """Ask an LLM for fresh CSS selectors for ``html``. Returns a map of whichever of the
+    item/title/link/date keys the reply supplied as strings (a key the LLM omits or gives
+    a non-string is dropped, so callers read it with ``.get``).
 
     Raises:
         HealError: the call failed or the reply was not the expected JSON object.

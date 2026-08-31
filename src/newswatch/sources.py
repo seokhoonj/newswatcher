@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal, cast, get_args
+from typing import Literal, get_args
 
 from newswatch import _toml
 from newswatch._atomic import write_text_atomic
@@ -107,8 +107,12 @@ def update_selectors(name: str, selectors: dict[str, str], path: Path | None = N
     sources = load_sources(path)
     if not any(s.name == name for s in sources):
         raise SourceError(f"no source named {name!r} to update")
-    fields = cast("dict[str, Any]", selectors)
-    updated = tuple(replace(s, **fields) if s.name == name else s for s in sources)
+    updated = tuple(
+        # keys are validated above to be selector fields, all typed str | None, so the
+        # str values are valid -- but mypy cannot see the guard, hence the narrow ignore.
+        replace(s, **selectors) if s.name == name else s  # type: ignore[arg-type]
+        for s in sources
+    )
     write_text_atomic(path, _render(updated), SourceError)
 
 

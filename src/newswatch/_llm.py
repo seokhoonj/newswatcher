@@ -14,7 +14,7 @@ from thinchat.errors import ThinchatError
 from thinchat.keys import ENV_BY_PROVIDER
 
 from newswatch import credentials
-from newswatch.errors import LLMError, NewswatchError
+from newswatch.errors import ConfigError, LLMError
 
 __all__ = ["DEFAULT_PROVIDER", "PROVIDERS", "make_llm_client", "scrub_secrets",
            "scrub_exception", "validate_provider"]
@@ -48,7 +48,7 @@ def scrub_secrets(text: str) -> str:
     for env_name in ENV_BY_PROVIDER.values():
         try:
             key = credentials.secret(env_name)
-        except NewswatchError:
+        except ConfigError:
             continue
         if key and key in text:
             text = text.replace(key, "***")
