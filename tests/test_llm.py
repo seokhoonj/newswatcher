@@ -29,6 +29,22 @@ def test_make_llm_client_construction_error_hides_key(monkeypatch, tmp_path):
     assert "SECRET-KEY-123" not in str(excinfo.value.__cause__)
 
 
+def test_make_llm_client_hides_an_explicitly_passed_key(monkeypatch, tmp_path):
+    # An api_key given in code is not in the env or credentials file, so scrub_secrets
+    # cannot resolve it -- it must still be scrubbed from the message and the cause.
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    def boom(*args, **kwargs):
+        raise ThinchatError("auth failed for key EXPLICIT-KEY-999")
+
+    monkeypatch.setattr(_llm, "make_client", boom)
+    with pytest.raises(LLMError) as excinfo:
+        _llm.make_llm_client(api_key="EXPLICIT-KEY-999", max_tokens=100, action="summarizing")
+    assert "EXPLICIT-KEY-999" not in str(excinfo.value)
+    assert "EXPLICIT-KEY-999" not in str(excinfo.value.__cause__)
+
+
 def test_scrub_exception_scrubs_the_whole_cause_chain(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")

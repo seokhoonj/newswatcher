@@ -137,8 +137,8 @@ def propose_selectors(
             reply = client.complete(_truncate(html), system=_SYSTEM).strip()
         except ThinchatError as err:
             raise HealError(
-                f"selector proposal failed: {scrub_secrets(str(err))}"
-            ) from scrub_exception(err)
+                f"selector proposal failed: {scrub_secrets(str(err), extra_key=api_key)}"
+            ) from scrub_exception(err, extra_key=api_key)
     return _parse_selectors(reply)
 
 

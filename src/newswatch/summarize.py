@@ -56,8 +56,8 @@ def summarize_article(
             model = client.model   # read while the client is open, before __exit__ closes it
         except ThinchatError as err:
             raise LLMError(
-                f"summary request failed: {scrub_secrets(str(err))}"
-            ) from scrub_exception(err)
+                f"summary request failed: {scrub_secrets(str(err), extra_key=api_key)}"
+            ) from scrub_exception(err, extra_key=api_key)
     if not text:
         raise LLMError("summary request returned an empty reply")
     return Summary(title=item.title, link=item.link, text=text, model=model)

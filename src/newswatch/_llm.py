@@ -35,27 +35,35 @@ def validate_provider(provider: str) -> None:
             f"unknown LLM provider {provider!r}; choose one of {', '.join(sorted(PROVIDERS))}")
 
 
-def scrub_secrets(text: str) -> str:
-    """Replace any resolvable provider key found in ``text`` with ``"***"``.
+def scrub_secrets(text: str, *, extra_key: str | None = None) -> str:
+    """Replace any provider key found in ``text`` with ``"***"``.
 
     A provider library's exception message can carry the API key -- Gemini, the default,
     sends the key as a URL query parameter, so an HTTP error string embeds it. newswatch
     interpolates such messages into its own errors and logs, so it scrubs the key first
-    rather than trusting the library not to include it. Best-effort: it consults the same
-    keys ``make_llm_client`` would use, and a credentials-file problem while scrubbing is
-    swallowed so the original error still surfaces.
+    rather than trusting the library not to include it. It redacts the keys
+    ``make_llm_client`` would resolve from the environment / credentials file, plus
+    ``extra_key`` when given -- an explicitly-passed ``api_key`` is not in either store, so
+    a caller must name it here for it to be scrubbed. Best-effort: a credentials-file
+    problem while scrubbing is swallowed so the original error still surfaces.
     """
+    keys = []
     for env_name in ENV_BY_PROVIDER.values():
         try:
-            key = credentials.secret(env_name)
+            resolved = credentials.secret(env_name)
         except ConfigError:
             continue
-        if key and key in text:
+        if resolved:
+            keys.append(resolved)
+    if extra_key:
+        keys.append(extra_key)
+    for key in keys:
+        if key in text:
             text = text.replace(key, "***")
     return text
 
 
-def scrub_exception(err: BaseException) -> BaseException:
+def scrub_exception(err: BaseException, *, extra_key: str | None = None) -> BaseException:
     """Scrub any resolvable provider key from ``err`` and its whole ``__cause__`` /
     ``__context__`` chain, in place, then return ``err``.
 
@@ -72,7 +80,9 @@ def scrub_exception(err: BaseException) -> BaseException:
     while node is not None and id(node) not in seen:
         seen.add(id(node))
         if node.args:
-            node.args = tuple(scrub_secrets(a) if isinstance(a, str) else a for a in node.args)
+            node.args = tuple(
+                scrub_secrets(a, extra_key=extra_key) if isinstance(a, str) else a
+                for a in node.args)
         node = node.__cause__ or node.__context__
     return err
 
@@ -105,5 +115,5 @@ def make_llm_client(
                            max_tokens=max_tokens, max_retries=_MAX_RETRIES)
     except ThinchatError as err:
         raise LLMError(
-            f"{action} could not start {provider}: {scrub_secrets(str(err))}"
-        ) from scrub_exception(err)
+            f"{action} could not start {provider}: {scrub_secrets(str(err), extra_key=key)}"
+        ) from scrub_exception(err, extra_key=key)
