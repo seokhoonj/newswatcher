@@ -1,3 +1,8 @@
+import json
+
+import pytest
+
+from newswatch.errors import CorpusError
 from newswatch.store import Article, FileStore
 
 
@@ -37,3 +42,44 @@ def test_load_is_oldest_first(tmp_path):
     store.save(_article("late", "2026-08-20T00:00:00Z"))
     store.save(_article("early", "2026-08-01T00:00:00Z"))
     assert [a.guid for a in store.load()] == ["early", "late"]
+
+
+def test_load_skips_a_corrupt_file(tmp_path):
+    store = FileStore(tmp_path)
+    store.save(_article("a1", "2026-08-15T00:00:00Z"))
+    (tmp_path / "articles" / "garbage.json").write_text("{ not json", encoding="utf-8")
+    loaded = store.load()
+    assert [a.guid for a in loaded] == ["a1"]   # the unreadable file is read as absent
+
+
+def test_load_skips_a_file_missing_required_fields(tmp_path):
+    store = FileStore(tmp_path)
+    store.save(_article("a1", "2026-08-15T00:00:00Z"))
+    envelope = {"schema_version": 1, "saved_at": "2026-08-15T00:00:00Z",
+                "article": {"guid": "x"}}   # missing title/link/etc.
+    (tmp_path / "articles" / "partial.json").write_text(json.dumps(envelope),
+                                                        encoding="utf-8")
+    assert [a.guid for a in store.load()] == ["a1"]
+
+
+def test_load_raises_on_a_forward_schema_version(tmp_path):
+    store = FileStore(tmp_path)
+    envelope = {"schema_version": 999, "saved_at": "2026-08-15T00:00:00Z",
+                "article": {}}
+    (tmp_path / "articles").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "articles" / "future.json").write_text(json.dumps(envelope),
+                                                       encoding="utf-8")
+    with pytest.raises(CorpusError):
+        store.load()
+
+
+def test_load_raises_on_an_unreadable_file(tmp_path, monkeypatch):
+    store = FileStore(tmp_path)
+    store.save(_article("a1", "2026-08-15T00:00:00Z"))
+
+    def _boom(self, *a, **k):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("pathlib.Path.read_text", _boom)
+    with pytest.raises(CorpusError):
+        store.load()
