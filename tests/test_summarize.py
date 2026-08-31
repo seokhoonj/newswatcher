@@ -35,7 +35,6 @@ def test_summarize_article_uses_body(monkeypatch):
     item = FeedItem(title="보험료 인상", link="https://e.com/1", guid="g", source_name="s")
     result = summarize.summarize_article(item, "본문 전문 텍스트")
     assert result.text == "보험료가 올랐다는 기사."
-    assert result.link == "https://e.com/1"
     assert result.model == "fake-model"
 
 

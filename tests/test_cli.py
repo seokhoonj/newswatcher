@@ -178,7 +178,7 @@ def _capture_provider(monkeypatch):
     def fake_summarize(item, body, *, provider, model, api_key=None):
         captured["provider"] = provider
         captured["model"] = model
-        return Summary(title="t", link="u", text="x", model="m")
+        return Summary(text="x", model="m")
 
     def fake_poll_sources(*args, **kwargs):
         kwargs["summarize"](object(), "body")   # invoke it to exercise the binding

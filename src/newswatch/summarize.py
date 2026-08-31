@@ -27,11 +27,9 @@ _SYSTEM = (
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Summary:
-    """One article's LLM summary: the ``title`` and ``link`` carried through for the
-    digest, our ``text``, and which ``model`` produced it."""
+    """One article's LLM summary: our original ``text`` and which ``model`` produced it.
+    (The article's own title and link travel with the ``FeedItem``, not here.)"""
 
-    title: str
-    link:  str
     text:  str
     model: str
 
@@ -41,7 +39,7 @@ def summarize_article(
     model: str | None = None, api_key: str | None = None,
 ) -> Summary:
     """Summarize ``item`` from its ``body`` (or, when body is empty, from the feed's
-    title + summary). Returns our original summary paired with the item's title/link.
+    title + summary). Returns our original summary text and the model that wrote it.
 
     Raises:
         LLMError: the provider is unknown, no key is available, the call failed, or it
@@ -60,4 +58,4 @@ def summarize_article(
             ) from scrub_exception(err, extra_key=api_key)
     if not text:
         raise LLMError("summary request returned an empty reply")
-    return Summary(title=item.title, link=item.link, text=text, model=model)
+    return Summary(text=text, model=model)

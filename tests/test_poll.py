@@ -17,7 +17,7 @@ class _Collect:
 
 
 def _fake_summary(item, body, **k):
-    return Summary(title=item.title, link=item.link, text=f"요약:{item.title}", model="m")
+    return Summary(text=f"요약:{item.title}", model="m")
 
 
 # Unused by these tests: _collect/_fetch_body are stubbed, so the gate is never read.
@@ -71,7 +71,7 @@ def test_poll_degrades_on_summary_error(tmp_path, monkeypatch):
     def summarize(item, body, **k):
         if item.guid == "g1":
             raise LLMError("boom")
-        return Summary(title=item.title, link=item.link, text="ok", model="m")
+        return Summary(text="ok", model="m")
 
     state = State()
     report = poll_sources((src,), (Topic("t"),), gate=_gate, state=state,
