@@ -36,13 +36,15 @@ Use `newswatch topics` and `newswatch sources` to inspect the registries. Run
 
 ## Commands
 
-- `add-topic` / `topics` — define and list topic filters.
-- `add-source` / `sources` — register and list sources.
-- `recent <url>` — preview a feed's latest items without storing, to check it before adding.
-- `poll` — run one collect → summarize → mail pass.
-- `watch [--every N]` — repeat `poll` on an interval in the foreground.
-- `articles [--topic --since --until]` — list archived articles.
-- `heal [--dry-run]` — check and repair crawl selectors that stopped matching.
+Run `newswatch --help` or `newswatch <command> --help` for every option;
+`newswatch --version` prints the version.
+
+- `add-topic <name> [--include WORD...] [--exclude WORD...]` / `topics` — define and list topic filters.
+- `add-source <name> <url> [--kind rss|crawl] [--topic NAME]... [--keep-all]` / `sources` — register and list sources. A crawl source also takes selectors: `--item --title --link` (required) and `--date --body-selector` (optional). `--keep-all` retains every article without keyword filtering.
+- `recent <url> [--limit N]` — preview a feed's latest items without storing, to check it before adding.
+- `poll` / `watch [--every N]` — collect → summarize → mail once, or repeat on an interval in the foreground. Both accept `--to ADDRESS` (digest recipient), `--no-mail`, `--no-store`, `--no-heal`, and the LLM `--provider` / `--model` flags.
+- `articles [--topic NAME] [--since DATE] [--until DATE]` — list archived articles.
+- `heal [--dry-run] [--provider P] [--model M]` — check and repair crawl selectors that stopped matching.
 - `schedule install|status|remove [--every N]` — register the recurring poll with cron.
 
 ## News feeds
