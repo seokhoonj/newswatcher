@@ -40,6 +40,7 @@ def get(url: str, gate: RobotsGate, *, session: requests.Session | None = None,
     """
     if not gate.can_fetch(url):
         raise FetchError(f"robots.txt disallows fetching {url}")
+    gate.throttle(url)   # honor the host's requested Crawl-delay between fetches
     http = session or new_session()
     try:
         response = http.get(url, timeout=timeout)
