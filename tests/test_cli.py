@@ -104,6 +104,17 @@ def test_poll_persists_state_after_successful_mail(monkeypatch, tmp_path):
     assert sent == [1] and writes == [1]
 
 
+def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
+    from newswatch.lock import single_instance
+    _xdg(monkeypatch, tmp_path)
+    ran = []
+    monkeypatch.setattr(cli, "_poll_once", lambda a: ran.append(1) or 0)
+    with single_instance("poll"):   # stand in for another poll already holding the lock
+        assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
+    assert ran == []   # the poll body did not run
+    assert "already running" in capsys.readouterr().err
+
+
 def _capture_provider(monkeypatch):
     """Run poll with the LLM calls stubbed, recording the provider and model the CLI
     actually binds into the summarizer it hands to the pipeline (tested by invoking that

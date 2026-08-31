@@ -22,6 +22,7 @@ from newswatch.errors import NewswatchError
 from newswatch.feed import parse_feed
 from newswatch.heal import heal_empty_sources, heal_source
 from newswatch.http import new_session
+from newswatch.lock import single_instance
 from newswatch.poll import poll_sources
 from newswatch.robots import default_gate
 from newswatch.schedule import (
@@ -135,6 +136,17 @@ def _run_recent(args: argparse.Namespace) -> int:
 
 
 def _run_poll(args: argparse.Namespace) -> int:
+    """Run one poll under a single-instance lock, so an overlapping cron or manual poll
+    does not double-spend the LLM, mail duplicates, or race on the watermark. A poll
+    already in progress is skipped (exit 0), not queued."""
+    with single_instance("poll") as acquired:
+        if not acquired:
+            print("newswatch: another poll is already running; skipping", file=sys.stderr)
+            return 0
+        return _poll_once(args)
+
+
+def _poll_once(args: argparse.Namespace) -> int:
     sources = load_sources()
     topics = load_topics()
     gate = default_gate()

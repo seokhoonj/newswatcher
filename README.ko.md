@@ -173,3 +173,7 @@ newswatch schedule remove
 스케줄링에는 `crontab` 명령이 필요합니다. 예약 실행도 대화형 poll과 같은 설정을
 사용하므로, LLM 키가 (`credentials.json` 또는 환경 변수로) 닿는지와 `config.toml`에
 저장하지 않은 설정이 예약 실행 환경에 제공되는지 확인해야 합니다.
+
+poll은 단일 인스턴스 lock을 잡으므로 예약 poll과 수동 poll이 동시에 돌지 않습니다.
+나중에 시작한 쪽은 이미 poll이 실행 중이라고 알리고 종료합니다. (lock은 `flock`을
+쓰므로 Linux/macOS에서 동작하며, Windows에는 lock이 없습니다.)

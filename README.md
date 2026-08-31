@@ -176,3 +176,7 @@ Scheduling requires the `crontab` command. The scheduled process uses the same
 configuration as an interactive poll, so make sure the LLM key is reachable (from
 `credentials.json` or its environment variable) along with any settings not stored
 in `config.toml`.
+
+A poll takes a single-instance lock, so a scheduled poll and a manual one never run
+at once — whichever starts second logs that a poll is already running and exits. (The
+lock uses `flock`, so it is effective on Linux and macOS; on Windows there is none.)
