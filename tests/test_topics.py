@@ -1,4 +1,15 @@
+import pytest
+
+from newswatch.errors import TopicError
 from newswatch.topics import Topic, add_topic, load_topics
+
+
+def test_scalar_topic_key_is_rejected(tmp_path):
+    # [topic] as a scalar instead of the [[topic]] table array is a clear error
+    path = tmp_path / "topics.toml"
+    path.write_text('topic = "x"\n', encoding="utf-8")
+    with pytest.raises(TopicError):
+        load_topics(path)
 
 
 def test_add_then_load_roundtrip(tmp_path):

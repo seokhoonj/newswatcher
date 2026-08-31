@@ -9,11 +9,10 @@ module only reads and writes the topic definitions.
 
 from __future__ import annotations
 
-import json
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from newswatch import _toml
 from newswatch._atomic import write_text_atomic
 from newswatch.config import config_dir
 from newswatch.errors import TopicError
@@ -52,7 +51,8 @@ def load_topics(path: Path | None = None) -> tuple[Topic, ...]:
     path = path or topics_path()
     if not path.exists():
         return ()
-    return tuple(_topic_from(entry, path) for entry in _read_entries(path))
+    return tuple(_topic_from(entry, path)
+                 for entry in _toml.read_table_array(path, "topic", TopicError))
 
 
 def add_topic(topic: Topic, path: Path | None = None) -> bool:
@@ -70,19 +70,6 @@ def add_topic(topic: Topic, path: Path | None = None) -> bool:
         return False
     write_text_atomic(path, _render((*existing, topic)), TopicError)
     return True
-
-
-def _read_entries(path: Path) -> list[dict[str, object]]:
-    try:
-        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as err:
-        raise TopicError(f"could not read {path}: {err}") from err
-    entries = parsed.get("topic")
-    if entries is None:
-        return []
-    if not isinstance(entries, list):
-        raise TopicError(f"{path}: [topic] must be a table array ([[topic]])")
-    return [entry for entry in entries if isinstance(entry, dict)]
 
 
 def _topic_from(entry: dict[str, object], path: Path) -> Topic:
@@ -109,18 +96,10 @@ def _keywords(raw: object, field_name: str, name: object) -> tuple[str, ...]:
 def _render(topics: tuple[Topic, ...]) -> str:
     blocks = []
     for topic in topics:
-        lines = ["[[topic]]", f"name = {_toml_str(topic.name)}"]
+        lines = ["[[topic]]", f"name = {_toml.quote(topic.name)}"]
         if topic.includes:
-            lines.append(f"includes = {_toml_list(topic.includes)}")
+            lines.append(f"includes = {_toml.array(topic.includes)}")
         if topic.excludes:
-            lines.append(f"excludes = {_toml_list(topic.excludes)}")
+            lines.append(f"excludes = {_toml.array(topic.excludes)}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks) + "\n"
-
-
-def _toml_str(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _toml_list(words: tuple[str, ...]) -> str:
-    return "[" + ", ".join(_toml_str(word) for word in words) + "]"

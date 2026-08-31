@@ -16,12 +16,11 @@ overrides generic body extraction for this source's articles.
 
 from __future__ import annotations
 
-import json
-import tomllib
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, cast
 
+from newswatch import _toml
 from newswatch._atomic import write_text_atomic
 from newswatch.config import config_dir
 from newswatch.errors import SourceError
@@ -71,7 +70,8 @@ def load_sources(path: Path | None = None) -> tuple[Source, ...]:
     path = path or sources_path()
     if not path.exists():
         return ()
-    return tuple(_source_from(entry, path) for entry in _read_entries(path))
+    return tuple(_source_from(entry, path)
+                 for entry in _toml.read_table_array(path, "source", SourceError))
 
 
 def add_source(source: Source, path: Path | None = None) -> bool:
@@ -108,19 +108,6 @@ def update_selectors(name: str, selectors: dict[str, str], path: Path | None = N
     fields = cast("dict[str, Any]", selectors)
     updated = tuple(replace(s, **fields) if s.name == name else s for s in sources)
     write_text_atomic(path, _render(updated), SourceError)
-
-
-def _read_entries(path: Path) -> list[dict[str, object]]:
-    try:
-        parsed = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as err:
-        raise SourceError(f"could not read {path}: {err}") from err
-    entries = parsed.get("source")
-    if entries is None:
-        return []
-    if not isinstance(entries, list):
-        raise SourceError(f"{path}: [source] must be a table array ([[source]])")
-    return [entry for entry in entries if isinstance(entry, dict)]
 
 
 def _source_from(entry: dict[str, object], path: Path) -> Source:
@@ -185,25 +172,17 @@ def _render(sources: tuple[Source, ...]) -> str:
     for s in sources:
         lines = [
             "[[source]]",
-            f"name = {_toml_str(s.name)}",
-            f"kind = {_toml_str(s.kind)}",
-            f"url = {_toml_str(s.url)}",
+            f"name = {_toml.quote(s.name)}",
+            f"kind = {_toml.quote(s.kind)}",
+            f"url = {_toml.quote(s.url)}",
         ]
         if s.topics:
-            lines.append(f"topics = {_toml_list(s.topics)}")
+            lines.append(f"topics = {_toml.array(s.topics)}")
         if s.keep_all:
             lines.append("keep_all = true")
         for field_name in _SELECTOR_FIELDS:
             value = getattr(s, field_name)
             if value is not None:
-                lines.append(f"{field_name} = {_toml_str(value)}")
+                lines.append(f"{field_name} = {_toml.quote(value)}")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks) + "\n"
-
-
-def _toml_str(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)
-
-
-def _toml_list(words: tuple[str, ...]) -> str:
-    return "[" + ", ".join(_toml_str(word) for word in words) + "]"
