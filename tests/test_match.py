@@ -35,6 +35,24 @@ def test_filtered_source_tags_only_matches():
     assert topics_for(_item("보험 뉴스"), src, (INS,)) == ("insurance",)
 
 
+def test_ascii_keyword_matches_whole_words_not_substrings():
+    ai = Topic("ai", includes=("ai",))
+    assert matches_topic(_item("AI regulation"), ai) is True    # case-insensitive whole word
+    assert matches_topic(_item("chairman quits"), ai) is False  # 'ai' inside 'chairman' is not a word
+
+
+def test_korean_keyword_matches_inside_compounds():
+    assert matches_topic(_item("보험료 인상"), INS) is True      # 보험 inside 보험료
+    assert matches_topic(_item("손해보험사 실적"), INS) is True   # 보험 inside 손해보험사
+    assert matches_topic(_item("손보사 실적"), INS) is True      # 손보 inside 손보사
+
+
+def test_ascii_exclude_matches_whole_words_not_substrings():
+    topic = Topic("markets", includes=("금리",), excludes=("ad",))
+    assert matches_topic(_item("금리 인상 ad"), topic) is False   # 'ad' present as a word -> excluded
+    assert matches_topic(_item("금리 인상 gradual"), topic) is True  # 'ad' inside 'gradual' does not exclude
+
+
 def test_assign_topics_returns_none_on_no_match():
     src = Source("범용지", kind="rss", url="u", topics=("insurance",))
     assert assign_topics(_item("은행"), src, (INS,)) is None
