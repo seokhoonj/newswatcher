@@ -12,7 +12,7 @@ import requests
 from newswatch.errors import FetchError
 from newswatch.robots import USER_AGENT, RobotsGate
 
-__all__ = ["new_session", "get", "fetch_robots"]
+__all__ = ["new_session", "get", "fetch_robots", "default_gate"]
 
 _TIMEOUT = 20.0
 
@@ -74,3 +74,9 @@ def fetch_robots(robots_url: str) -> str | None:
     if response.status_code >= 400:
         return None
     return response.text
+
+
+def default_gate() -> RobotsGate:
+    """A robots gate whose fetcher pulls robots.txt over this HTTP layer. Lives here,
+    beside ``fetch_robots``, so ``robots`` needs no import of ``http`` (no cycle)."""
+    return RobotsGate(USER_AGENT, fetch_robots)

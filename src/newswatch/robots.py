@@ -15,7 +15,7 @@ from collections.abc import Callable
 from urllib import robotparser
 from urllib.parse import urlsplit, urlunsplit
 
-__all__ = ["USER_AGENT", "RobotsGate", "default_gate"]
+__all__ = ["USER_AGENT", "RobotsGate"]
 
 # An identifying User-Agent: robots rules match against it, and a site owner reading
 # logs can see who we are. Sent on every request (see ``http``).
@@ -76,14 +76,6 @@ class RobotsGate:
                 parser.parse(text.splitlines())
             self._parsers[host] = parser
         return parser
-
-
-def default_gate() -> RobotsGate:
-    """A gate whose fetcher pulls robots.txt over newswatch's HTTP layer. Imported
-    lazily to avoid a module import cycle with ``http`` (which imports this module)."""
-    from newswatch.http import fetch_robots
-
-    return RobotsGate(USER_AGENT, fetch_robots)
 
 
 def _host_key(url: str) -> str:

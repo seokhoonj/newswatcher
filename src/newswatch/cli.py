@@ -21,10 +21,9 @@ from newswatch.digest import send_digest
 from newswatch.errors import NewswatchError
 from newswatch.feed import parse_feed
 from newswatch.heal import heal_empty_sources, heal_source
-from newswatch.http import get, new_session
+from newswatch.http import default_gate, get, new_session
 from newswatch.lock import single_instance
 from newswatch.poll import poll_sources
-from newswatch.robots import default_gate
 from newswatch.schedule import (
     DEFAULT_INTERVAL_MINUTES,
     install_poll,
