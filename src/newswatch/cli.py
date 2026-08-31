@@ -147,7 +147,6 @@ def _run_poll(args: argparse.Namespace) -> int:
         _heal_empty_sources(sources, gate, state, provider=provider, model=model)
         if not args.no_heal else ()
     )
-    write_state(state)
     for name, reason in report.skipped:
         print(f"newswatch: skipping {name}: {reason}", file=sys.stderr)
     if not args.no_mail:
@@ -157,6 +156,9 @@ def _run_poll(args: argparse.Namespace) -> int:
         else:
             print("newswatch: no digest recipient (set --to or NEWSWATCH_DIGEST_TO); "
                   "not mailing", file=sys.stderr)
+    # Persist the watermark only after the digest is out (or mailing was skipped): a
+    # send failure then re-collects and re-sends next run rather than losing the digest.
+    write_state(state)
     print(f"{len(report.collected)} new article(s)")
     return 0
 

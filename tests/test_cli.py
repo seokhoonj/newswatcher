@@ -67,6 +67,43 @@ def test_unknown_command_exits_nonzero(monkeypatch, tmp_path):
     assert code != 0
 
 
+def _poll_returning_one(monkeypatch):
+    """Stub the pipeline to return one collected article and record write_state calls."""
+    from newswatch.poll import PollReport
+    from newswatch.store import Article
+    article = Article(guid="g1", title="t", link="https://e.com/1", source_name="s",
+                      published="2026-08-15T00:00:00Z", topics=("markets",), summary="x")
+    writes = []
+    monkeypatch.setattr(cli, "poll_sources",
+                        lambda *a, **k: PollReport(collected=(article,),
+                                                   empty_crawl_sources=(), skipped=()))
+    monkeypatch.setattr(cli, "write_state", lambda *a, **k: writes.append(1))
+    monkeypatch.setattr(cli, "read_state", lambda *a, **k: object())
+    return writes
+
+
+def test_poll_does_not_persist_state_when_mail_fails(monkeypatch, tmp_path):
+    from newswatch.errors import NotifyError
+    _xdg(monkeypatch, tmp_path)
+    writes = _poll_returning_one(monkeypatch)
+
+    def _boom(*a, **k):
+        raise NotifyError("smtp down")
+
+    monkeypatch.setattr(cli, "send_digest", _boom)
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
+    assert writes == []   # watermark not advanced, so the digest re-sends next run
+
+
+def test_poll_persists_state_after_successful_mail(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    writes = _poll_returning_one(monkeypatch)
+    sent = []
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1))
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 0
+    assert sent == [1] and writes == [1]
+
+
 def _capture_provider(monkeypatch):
     """Run poll with the LLM calls stubbed, recording the provider and model the CLI
     actually binds into the summarizer it hands to the pipeline (tested by invoking that
