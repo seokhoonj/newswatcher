@@ -1,4 +1,30 @@
+import argparse
+
+import pytest
+
 import newswatch.cli as cli
+
+
+def test_watch_clamps_negative_sleep(monkeypatch):
+    # When a poll overruns the interval, the next-tick time is already in the past, so
+    # the naive (next_tick - now) is negative. time.sleep rejects a negative value with
+    # ValueError -- which, not being a NewswatchError, would crash the watcher.
+    monkeypatch.setattr(cli, "_run_poll", lambda a: 0)
+    times = iter([0.0, 5000.0, 5000.5])   # init, post-poll (overran), pre-sleep
+    monkeypatch.setattr("time.monotonic", lambda: next(times))
+    slept = []
+
+    class _Stop(Exception):
+        pass
+
+    def _sleep(seconds):
+        slept.append(seconds)
+        raise _Stop
+
+    monkeypatch.setattr("time.sleep", _sleep)
+    with pytest.raises(_Stop):
+        cli._run_watch(argparse.Namespace(every=None))
+    assert slept == [0.0]   # clamped to zero, never negative
 
 
 def _xdg(monkeypatch, tmp_path):

@@ -171,7 +171,7 @@ def _run_watch(args: argparse.Namespace) -> int:
     while True:
         _run_poll(args)
         next_tick = max(next_tick + every * 60, time.monotonic())
-        time.sleep(next_tick - time.monotonic())
+        time.sleep(max(0.0, next_tick - time.monotonic()))   # a poll that overran sleeps 0
 
 
 def _run_articles(args: argparse.Namespace) -> int:
