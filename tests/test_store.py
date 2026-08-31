@@ -37,6 +37,23 @@ def test_load_filters_by_topic_and_date(tmp_path):
     assert {a.guid for a in store.load(since="2026-08-15")} == {"a2"}
 
 
+def test_load_date_range_is_half_open(tmp_path):
+    store = FileStore(tmp_path)
+    store.save(_article("at_since", "2026-08-10T00:00:00Z"))
+    store.save(_article("mid", "2026-08-12T00:00:00Z"))
+    store.save(_article("at_until", "2026-08-15T00:00:00Z"))
+    got = {a.guid for a in store.load(since="2026-08-10T00:00:00Z",
+                                      until="2026-08-15T00:00:00Z")}
+    assert got == {"at_since", "mid"}   # since inclusive, until exclusive
+
+
+def test_load_falls_back_to_saved_at_when_published_empty(tmp_path):
+    store = FileStore(tmp_path)
+    store.save(_article("no_date", ""))   # empty published -> filtered by saved_at (now)
+    assert {a.guid for a in store.load(since="2000-01-01", until="2099-01-01")} == {"no_date"}
+    assert store.load(until="2000-01-01") == ()   # a past window excludes today's saved_at
+
+
 def test_load_is_oldest_first(tmp_path):
     store = FileStore(tmp_path)
     store.save(_article("late", "2026-08-20T00:00:00Z"))

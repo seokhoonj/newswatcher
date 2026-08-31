@@ -1,4 +1,4 @@
-from newswatch.errors import ArchiveError, LLMError
+from newswatch.errors import ArchiveError, FetchError, LLMError
 from newswatch.feed import FeedItem
 from newswatch.poll import poll_sources
 from newswatch.robots import RobotsGate
@@ -102,6 +102,26 @@ def test_poll_degrades_on_store_error(tmp_path, monkeypatch):
     assert report.collected == ()
     assert any("e.com/1" in name for name, _ in report.skipped)
     assert state.is_new("지", items[0]) is True   # unmarked -> retry next poll
+
+
+def test_poll_skips_a_failed_source_and_collects_a_later_one(tmp_path, monkeypatch):
+    import newswatch.poll as poll
+    bad = Source("깨진소스", kind="rss", url="u", topics=("t",), keep_all=True)
+    good = Source("정상소스", kind="rss", url="u", topics=("t",), keep_all=True)
+    items = (FeedItem(title="a", link="https://e.com/1", guid="g1",
+                      published="2026-08-15T00:00:00Z", source_name="정상소스"),)
+
+    def collect(s, g, sess):
+        if s.name == "깨진소스":
+            raise FetchError("feed returned 500")
+        return items
+
+    monkeypatch.setattr(poll, "_collect", collect)
+    monkeypatch.setattr(poll, "_fetch_body", lambda item, s, g, sess: "본문")
+    report = poll_sources((bad, good), (Topic("t"),), gate=_gate, state=State(),
+                          store=FileStore(tmp_path), summarize=_fake_summary)
+    assert [a.guid for a in report.collected] == ["g1"]   # the later source still ran
+    assert any(name == "깨진소스" for name, _ in report.skipped)
 
 
 def test_empty_crawl_source_is_reported(tmp_path, monkeypatch):

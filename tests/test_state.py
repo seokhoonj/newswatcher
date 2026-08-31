@@ -67,6 +67,19 @@ def test_seen_set_is_bounded(tmp_path):
     assert len(st.seen_guids_by_source["s"]) == _SEEN_CAP
 
 
+def test_evicted_guid_relisted_is_recollected_then_reseen(tmp_path):
+    # After eviction a re-listed guid collects once more; marking it seen again keeps the
+    # cap and evicts the next-oldest -- the full evict/relist/re-mark lifecycle.
+    st = State()
+    for i in range(_SEEN_CAP + 10):
+        st.mark_seen("s", _item(f"g{i}"))
+    assert st.is_new("s", _item("g0")) is True      # g0 was evicted -> collectable again
+    st.mark_seen("s", _item("g0"))                  # re-collected
+    assert st.is_new("s", _item("g0")) is False     # now seen again
+    assert len(st.seen_guids_by_source["s"]) == _SEEN_CAP
+    assert st.is_new("s", _item("g10")) is True     # marking g0 evicted the next-oldest
+
+
 def test_empty_poll_counter(tmp_path):
     st = State()
     assert st.note_empty("s") == 1
