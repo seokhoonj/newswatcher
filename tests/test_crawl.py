@@ -1,5 +1,16 @@
+import pytest
+
 from newswatch.crawl import extract_items, parse_selector
+from newswatch.errors import SourceError
 from newswatch.sources import Source
+
+
+def test_extract_missing_selectors_raises_sourceerror():
+    # A crawl Source built directly (bypassing add_source validation) with no selectors
+    # must fail with the domain error, not an opaque TypeError -- and survive python -O.
+    src = Source("x", kind="crawl", url="https://e.com/list")   # item/title/link = None
+    with pytest.raises(SourceError):
+        extract_items("<html></html>", src)
 
 HTML = """<html><body><ul class="list">
 <li class="row"><a class="tit" href="/a/1">보험료 인상</a><span class="date">2026-08-15</span></li>

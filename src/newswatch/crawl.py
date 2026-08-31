@@ -13,6 +13,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
 
+from newswatch.errors import SourceError
 from newswatch.feed import FeedItem, normalize_date
 from newswatch.http import get
 from newswatch.robots import RobotsGate
@@ -40,8 +41,12 @@ def extract_items(html: str, source: Source) -> tuple[FeedItem, ...]:
     link resolves empty is skipped (nothing to fetch or dedup on). Relative links are
     resolved against the source URL. Never raises on selector misses — a zero-row
     result is the healer's trigger, not an error here."""
+    if not (source.item and source.title and source.link):
+        # add_source/_source_from validate this, but Source() itself does not, and an
+        # assert would vanish under python -O -- raise the domain error unconditionally.
+        raise SourceError(
+            f"crawl source {source.name!r} is missing its item/title/link selectors")
     soup = BeautifulSoup(html, "lxml")
-    assert source.item and source.title and source.link  # guaranteed by Source validation
     items = []
     for row in soup.select(source.item):
         link = _select_value(row, source.link, base=source.url)
