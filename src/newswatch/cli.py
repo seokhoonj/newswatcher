@@ -14,6 +14,7 @@ import argparse
 import functools
 import sys
 import time
+from typing import TYPE_CHECKING
 
 from newswatch import __version__, config
 from newswatch._llm import DEFAULT_PROVIDER, validate_provider
@@ -21,6 +22,7 @@ from newswatch.digest import send_digest
 from newswatch.errors import NewswatchError
 from newswatch.feed import parse_feed
 from newswatch.heal import heal_source, needs_heal
+from newswatch.http import new_session
 from newswatch.poll import poll_sources
 from newswatch.robots import RobotsGate, default_gate
 from newswatch.schedule import (
@@ -35,6 +37,9 @@ from newswatch.state import State, read_state, write_state
 from newswatch.store import FileStore
 from newswatch.summarize import summarize_article
 from newswatch.topics import Topic, add_topic, load_topics
+
+if TYPE_CHECKING:
+    import requests
 
 __all__ = ["main"]
 
@@ -141,12 +146,14 @@ def _run_poll(args: argparse.Namespace) -> int:
     store = None if args.no_store else FileStore()
     provider, model = _resolve_llm_choice(args)
     summarize = functools.partial(summarize_article, provider=provider, model=model)
-    report = poll_sources(sources, topics, gate=gate, state=state, store=store,
-                          summarize=summarize)
-    heal_notes = (
-        _heal_empty_sources(sources, gate, state, provider=provider, model=model)
-        if not args.no_heal else ()
-    )
+    with new_session() as session:   # one pooled connection for every fetch this poll
+        report = poll_sources(sources, topics, gate=gate, state=state, store=store,
+                              session=session, summarize=summarize)
+        heal_notes = (
+            _heal_empty_sources(sources, gate, state, session=session,
+                                provider=provider, model=model)
+            if not args.no_heal else ()
+        )
     for name, reason in report.skipped:
         print(f"newswatch: skipping {name}: {reason}", file=sys.stderr)
     if not args.no_mail:
@@ -209,7 +216,7 @@ def _run_schedule(args: argparse.Namespace) -> int:
 
 def _heal_empty_sources(
     sources: tuple[Source, ...], gate: RobotsGate, state: State, *,
-    provider: str, model: str | None,
+    session: requests.Session | None = None, provider: str, model: str | None,
 ) -> tuple[str, ...]:
     """Heal each crawl source that has hit the empty-poll threshold; return the notes.
     A heal failure for one source is reported but does not abort the poll."""
@@ -218,7 +225,8 @@ def _heal_empty_sources(
         if not needs_heal(source, state):
             continue
         try:
-            result = heal_source(source, gate=gate, apply=True, provider=provider, model=model)
+            result = heal_source(source, gate=gate, session=session, apply=True,
+                                 provider=provider, model=model)
         except NewswatchError as err:
             notes.append(f"heal of {source.name!r} failed: {err}")
             continue
