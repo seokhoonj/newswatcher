@@ -51,11 +51,11 @@ def summarize_article(
                         max_tokens=_MAX_TOKENS, action="summarizing") as client:
         try:
             text = client.complete(prompt, system=_SYSTEM).strip()
-            model = client.model   # read while the client is open, before __exit__ closes it
+            resolved_model = client.model   # the model actually used; read before the client closes
         except ThinchatError as err:
             raise LLMError(
                 f"summary request failed: {scrub_secrets(str(err), extra_key=api_key)}"
             ) from scrub_exception(err, extra_key=api_key)
     if not text:
         raise LLMError("summary request returned an empty reply")
-    return Summary(text=text, model=model)
+    return Summary(text=text, model=resolved_model)
