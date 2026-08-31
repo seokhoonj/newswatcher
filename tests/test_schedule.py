@@ -6,6 +6,8 @@ from newswatch.schedule import (
     DEFAULT_INTERVAL_MINUTES,
     install_poll,
     parse_interval,
+    poll_status,
+    remove_poll,
 )
 
 
@@ -64,3 +66,42 @@ def test_install_rejects_non_representable_interval(monkeypatch):
         install_poll(90)     # 1.5h -- not a simple cron step
     with pytest.raises(ScheduleError):
         install_poll(1500)   # 25h -- not a simple cron step
+
+
+def _marker_lines(store):
+    from newswatch.schedule import _MARKER
+    return [ln for ln in store["lines"] if _MARKER in ln]
+
+
+def test_install_replaces_existing_not_duplicate(monkeypatch):
+    store = _fake_crontab(monkeypatch)
+    install_poll(30)
+    install_poll(60)
+    assert len(_marker_lines(store)) == 1                 # one poll line, not two
+    assert _marker_lines(store)[0].startswith("0 */1 * * * ")   # the latest interval
+
+
+def test_install_keeps_other_lines(monkeypatch):
+    store = _fake_crontab(monkeypatch, ["0 3 * * * /usr/bin/backup"])
+    install_poll(30)
+    assert "0 3 * * * /usr/bin/backup" in store["lines"]   # unrelated job untouched
+
+
+def test_remove_absent_reports_false(monkeypatch):
+    _fake_crontab(monkeypatch, ["0 3 * * * /usr/bin/backup"])
+    assert remove_poll() is False
+
+
+def test_remove_present_reports_true_and_keeps_others(monkeypatch):
+    store = _fake_crontab(monkeypatch, ["0 3 * * * /usr/bin/backup"])
+    install_poll(30)
+    assert remove_poll() is True
+    assert _marker_lines(store) == []
+    assert "0 3 * * * /usr/bin/backup" in store["lines"]
+
+
+def test_status_reports_installed_line(monkeypatch):
+    _fake_crontab(monkeypatch)
+    assert poll_status() is None
+    line = install_poll(30)
+    assert poll_status() == line
