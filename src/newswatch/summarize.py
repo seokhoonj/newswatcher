@@ -25,7 +25,7 @@ _SYSTEM = (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Summary:
     """One article's LLM summary: the ``title`` and ``link`` carried through for the
     digest, our ``text``, and which ``model`` produced it."""

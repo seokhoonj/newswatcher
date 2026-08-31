@@ -25,7 +25,7 @@ _ARTICLES_DIRNAME = "articles"
 _TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class Article:
     """One archived article: metadata and our summary. No body -- bodies are transient
     summary input, never stored. ``published`` is ISO-8601 (or "") and orders the

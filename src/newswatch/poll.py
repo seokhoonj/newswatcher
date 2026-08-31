@@ -31,7 +31,7 @@ __all__ = ["PollReport", "poll_sources"]
 Summarizer = Callable[[FeedItem, str], Summary]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class PollReport:
     """What one poll produced: the ``collected`` new articles (in collection order),
     the ``empty_crawl_sources`` whose selector matched nothing, and ``skipped`` as
@@ -70,7 +70,8 @@ def poll_sources(
         for article in _process(source, items, topics, gate, state, store,
                                 session, summarize, skipped):
             collected.append(article)
-    return PollReport(tuple(collected), tuple(empty), tuple(skipped))
+    return PollReport(collected=tuple(collected), empty_crawl_sources=tuple(empty),
+                      skipped=tuple(skipped))
 
 
 def _process(

@@ -82,7 +82,7 @@ def _capture_provider(monkeypatch):
 
     def fake_poll_sources(*args, **kwargs):
         kwargs["summarize"](object(), "body")   # invoke it to exercise the binding
-        return PollReport((), (), ())
+        return PollReport(collected=(), empty_crawl_sources=(), skipped=())
 
     monkeypatch.setattr(cli, "summarize_article", fake_summarize)
     monkeypatch.setattr(cli, "poll_sources", fake_poll_sources)

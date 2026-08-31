@@ -39,7 +39,7 @@ _SYSTEM = (
 _SELECTOR_KEYS = ("item", "title", "link", "date")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class HealResult:
     """The outcome of a heal attempt on one source: the ``old`` and proposed ``new``
     selector maps, whether the new ones were ``applied`` (validated and written), and a
@@ -82,13 +82,14 @@ def heal_source(
     candidate = replace(source, item=proposed.get("item"), title=proposed.get("title"),
                         link=proposed.get("link"), date=proposed.get("date") or None)
     if not _validates(html, candidate):
-        return HealResult(source.name, old, proposed, applied=False,
-                          note=f"proposed selectors for {source.name!r} did not extract; not applied")
+        return HealResult(
+            source_name=source.name, old=old, new=proposed, applied=False,
+            note=f"proposed selectors for {source.name!r} did not extract; not applied")
     changes = {k: v for k, v in proposed.items() if k in _SELECTOR_KEYS and v}
     if apply:
         update_selectors(source.name, changes, path)
     diff = ", ".join(f"{k}: {old.get(k, '-')!r} -> {v!r}" for k, v in changes.items())
-    return HealResult(source.name, old, changes, applied=apply,
+    return HealResult(source_name=source.name, old=old, new=changes, applied=apply,
                       note=f"repaired {source.name!r} selectors ({diff})")
 
 
