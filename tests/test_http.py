@@ -51,6 +51,41 @@ def test_get_raises_on_non_2xx():
         http.get("https://e.com/x", gate, session=_Session())
 
 
+# --- get() manages the session it creates, and leaves an injected one to its owner ---
+
+class _RecordingSession:
+    def __init__(self):
+        self.closed = False
+
+    def get(self, url, timeout=None):
+        return _Resp(200, "ok")
+
+    def close(self):
+        self.closed = True
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
+
+def test_get_closes_a_session_it_created(monkeypatch):
+    created = _RecordingSession()
+    monkeypatch.setattr(http, "new_session", lambda: created)
+    gate = RobotsGate("ua", lambda url: None)
+    http.get("https://e.com/x", gate)   # no session passed -> get() must create and close one
+    assert created.closed is True
+
+
+def test_get_does_not_close_an_injected_session():
+    injected = _RecordingSession()
+    gate = RobotsGate("ua", lambda url: None)
+    http.get("https://e.com/x", gate, session=injected)
+    assert injected.closed is False   # the caller owns an injected session
+
+
 # --- fetch_robots: RFC 9309 fail-open on 4xx, fail-closed on 5xx / unreachable ---
 
 def test_fetch_robots_4xx_allows(monkeypatch):

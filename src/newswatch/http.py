@@ -5,6 +5,8 @@ robots rule is enforced in one place rather than at each call site."""
 
 from __future__ import annotations
 
+import contextlib
+
 import requests
 
 from newswatch.errors import FetchError
@@ -41,10 +43,13 @@ def get(url: str, gate: RobotsGate, *, session: requests.Session | None = None,
     if not gate.can_fetch(url):
         raise FetchError(f"robots.txt disallows fetching {url}")
     gate.throttle(url)   # honor the host's requested Crawl-delay between fetches
-    http = session or new_session()
+    # Close only a session we created; an injected one belongs to the caller (a poll
+    # threads one pooled session through all its fetches).
+    manage = contextlib.nullcontext(session) if session is not None else new_session()
     try:
-        response = http.get(url, timeout=timeout)
-        response.raise_for_status()
+        with manage as http:
+            response = http.get(url, timeout=timeout)
+            response.raise_for_status()
     except requests.RequestException as err:
         raise FetchError(f"could not fetch {url}: {err}") from err
     return response.text
