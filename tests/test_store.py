@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 import pytest
 
@@ -47,11 +48,20 @@ def test_load_date_range_is_half_open(tmp_path):
     assert got == {"at_since", "mid"}   # since inclusive, until exclusive
 
 
-def test_load_falls_back_to_saved_at_when_published_empty(tmp_path):
+def test_load_falls_back_to_saved_at_when_published_empty(tmp_path, monkeypatch):
+    import newswatch.store as store_mod
+
+    class _FixedDatetime:
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 8, 15, 12, 0, 0, tzinfo=tz)
+
+    monkeypatch.setattr(store_mod, "datetime", _FixedDatetime)   # pin saved_at deterministically
     store = FileStore(tmp_path)
-    store.save(_article("no_date", ""))   # empty published -> filtered by saved_at (now)
-    assert {a.guid for a in store.load(since="2000-01-01", until="2099-01-01")} == {"no_date"}
-    assert store.load(until="2000-01-01") == ()   # a past window excludes today's saved_at
+    store.save(_article("no_date", ""))   # empty published -> filtered/ordered by saved_at
+    assert {a.guid for a in store.load(since="2026-08-15", until="2026-08-16")} == {"no_date"}
+    assert store.load(until="2026-08-15") == ()    # until is exclusive of the saved day
+    assert store.load(since="2026-08-16") == ()    # window after the saved day
 
 
 def test_load_is_oldest_first(tmp_path):

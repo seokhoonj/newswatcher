@@ -77,8 +77,10 @@ class FileStore:
              until: str | None = None) -> tuple[Article, ...]:
         """Return archived articles oldest-first, optionally narrowed to a ``topic``
         tag and a half-open date range ``[since, until)`` compared against ``published``
-        as ISO-8601 strings (a bare ``YYYY-MM-DD`` bound works by prefix). A corrupt
-        or forward-schema file reads as absent, so one bad file does not sink the read.
+        as ISO-8601 strings (an article with no ``published`` date is ranged and ordered
+        by its archive timestamp instead; a bare ``YYYY-MM-DD`` bound works by prefix). A
+        corrupt or forward-schema file reads as absent, so one bad file does not sink the
+        read.
 
         Raises:
             ArchiveError: a stored file could not be read (an I/O failure, as opposed to
