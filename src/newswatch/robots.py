@@ -23,8 +23,9 @@ USER_AGENT = "newswatch (+https://github.com/seokhoonj/newswatch)"
 class RobotsGate:
     """Per-host robots.txt cache answering ``can_fetch`` / ``crawl_delay``. Construct
     with the identifying ``user_agent`` and a ``fetch`` that returns a host's
-    robots.txt text (or None when the host has none / it could not be fetched — an
-    absent robots.txt allows everything, the robots-spec default)."""
+    robots.txt text (or None when the host has no robots.txt — an absent robots.txt
+    allows everything, the robots-spec default). A server error or unreachable host is
+    the fetcher's concern: ``fetch`` returns disallow-all rules for those, not None."""
 
     def __init__(self, user_agent: str, fetch: Callable[[str], str | None]) -> None:
         self._user_agent = user_agent
