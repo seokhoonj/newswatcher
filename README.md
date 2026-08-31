@@ -34,6 +34,17 @@ English keywords for an English feed, Korean keywords for a Korean feed.
 Use `newswatch topics` and `newswatch sources` to inspect the registries. Run
 `newswatch --help` or `newswatch <command> --help` for all commands and options.
 
+## Commands
+
+- `add-topic` / `topics` — define and list topic filters.
+- `add-source` / `sources` — register and list sources.
+- `recent <url>` — preview a feed's latest items without storing, to check it before adding.
+- `poll` — run one collect → summarize → mail pass.
+- `watch [--every N]` — repeat `poll` on an interval in the foreground.
+- `articles [--topic --since --until]` — list archived articles.
+- `heal [--dry-run]` — check and repair crawl selectors that stopped matching.
+- `schedule install|status|remove [--every N]` — register the recurring poll with cron.
+
 ## News feeds
 
 Any valid RSS/Atom feed works as a source. A representative set of verified

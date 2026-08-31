@@ -33,6 +33,17 @@ newswatch poll
 `newswatch topics`와 `newswatch sources`로 등록 내용을 확인할 수 있습니다. 전체
 명령과 옵션은 `newswatch --help` 또는 `newswatch <command> --help`에서 확인합니다.
 
+## 명령
+
+- `add-topic` / `topics` — 토픽 필터를 정의하고 나열합니다.
+- `add-source` / `sources` — 소스를 등록하고 나열합니다.
+- `recent <url>` — 등록 전에 피드의 최신 항목을 저장 없이 미리 봅니다.
+- `poll` — 수집 → 요약 → 발송을 한 번 수행합니다.
+- `watch [--every N]` — `poll`을 주기적으로 포그라운드에서 반복합니다.
+- `articles [--topic --since --until]` — archive된 기사를 나열합니다.
+- `heal [--dry-run]` — 매칭이 끊긴 crawl selector를 점검하고 복구합니다.
+- `schedule install|status|remove [--every N]` — 반복 poll을 cron에 등록합니다.
+
 ## 뉴스 피드
 
 유효한 RSS/Atom 피드는 무엇이든 소스가 됩니다. 아래는 검증된 국내 피드의 대표
