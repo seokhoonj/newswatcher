@@ -2,7 +2,8 @@
 
 newswatch는 RSS 피드와 robots 정책이 허용하는 목록 페이지를 확인하고, 새 기사를
 사용자가 정의한 토픽과 매칭한 뒤 LLM으로 요약하여 토픽별 이메일 다이제스트 한 통을
-보냅니다.
+보냅니다. 토픽은 직접 정의하므로 같은 도구로 종목, 기술, 정책, 그 밖에 피드가 다루는
+어떤 주제든 추적할 수 있습니다.
 
 ## 설치
 
@@ -18,16 +19,39 @@ pip install newswatch
 (LLM 서비스를 제공하는 업체)용 API 키를 설정한 다음 한 번 poll을 실행합니다.
 
 ```sh
-newswatch add-topic 보험 --include 보험 재보험 --exclude 스포츠
-newswatch add-source 보험뉴스 https://example.com/feed.xml \
-  --kind rss --topic 보험
+newswatch add-topic 증시 --include 코스피 금리 실적 반도체 --exclude 연예
+newswatch add-source 한국경제 https://www.hankyung.com/feed/all-news \
+  --kind rss --topic 증시
 export NEWSWATCH_DIGEST_TO=you@example.com
 export GEMINI_API_KEY=your-api-key
 newswatch poll
 ```
 
+토픽은 피드의 언어로 매칭하므로 키워드도 피드 언어에 맞춥니다. 한국어 피드에는 한국어
+키워드를, 영어 피드에는 영어 키워드를 씁니다.
+
 `newswatch topics`와 `newswatch sources`로 등록 내용을 확인할 수 있습니다. 전체
 명령과 옵션은 `newswatch --help` 또는 `newswatch <command> --help`에서 확인합니다.
+
+## 뉴스 피드
+
+유효한 RSS/Atom 피드는 무엇이든 소스가 됩니다. 아래는 검증된 국내 피드의 대표
+목록이고, 섹션별로 나누고 검증 시점에 살아 있던 피드를 표시한 전체 목록은
+[docs/korean-news-rss.md](docs/korean-news-rss.md)에 있습니다. 피드가 없는 사이트는
+`--kind crawl` 소스로 붙일 수 있습니다.
+
+| 언론사 | 분야 | 피드 URL |
+|--------|------|----------|
+| 연합뉴스 | 통신 | `https://www.yna.co.kr/rss/news.xml` |
+| 한국경제 | 경제 | `https://www.hankyung.com/feed/all-news` |
+| 조선비즈 | 경제 | `https://biz.chosun.com/arc/outboundfeeds/rss/?outputType=xml` |
+| 매일경제 | 경제 | `https://www.mk.co.kr/rss/30000001/` |
+| 이데일리 | 경제 | `http://rss.edaily.co.kr/edaily_news.xml` |
+| 머니투데이 | 경제 | `http://rss.mt.co.kr/mt_news.xml` |
+| 전자신문 | IT | `https://rss.etnews.com/Section901.xml` |
+| 지디넷코리아 | IT | `https://feeds.feedburner.com/zdkorea` |
+| The Korea Herald | 영문 | `https://www.koreaherald.com/rss/newsAll` |
+| The Korea Times | 영문 | `https://feed.koreatimes.co.kr/k/allnews.xml` |
 
 ## 설정 파일
 
@@ -41,13 +65,13 @@ newswatch는 직접 편집하는 설정을 `$XDG_CONFIG_HOME/newswatch`에 저�
 
 ```toml
 [[topic]]
-name = "보험"
-includes = ["보험", "재보험", "언더라이팅"]
-excludes = ["스포츠"]
+name = "증시"
+includes = ["코스피", "금리", "실적", "반도체"]
+excludes = ["연예"]
 
 [[topic]]
-name = "규제"
-includes = ["금융당국", "지급여력", "자본규제"]
+name = "반도체"
+includes = ["반도체", "파운드리", "HBM", "TSMC", "엔비디아"]
 ```
 
 `sources.toml`에는 RSS 또는 crawl 소스를 작성합니다. `topics`는 해당 소스에 적용할
@@ -56,16 +80,16 @@ includes = ["금융당국", "지급여력", "자본규제"]
 
 ```toml
 [[source]]
-name = "보험업계-피드"
+name = "한국경제"
 kind = "rss"
-url = "https://example.com/feed.xml"
-topics = ["보험", "규제"]
+url = "https://www.hankyung.com/feed/all-news"
+topics = ["증시", "반도체"]
 
 [[source]]
-name = "감독기관-뉴스"
+name = "거래소-공시"
 kind = "crawl"
-url = "https://example.go.kr/news"
-topics = ["규제"]
+url = "https://example.com/markets/notices"
+topics = ["증시"]
 item = "article.news-item"
 title = "h2"
 link = "a@href"

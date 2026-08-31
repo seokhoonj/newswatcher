@@ -2,7 +2,9 @@
 
 newswatch watches RSS feeds and robots-permitted listing pages, matches new
 articles against topics you define, summarizes the matches with an LLM, and
-emails one topic-grouped digest.
+emails one topic-grouped digest. The topics are yours to define, so the same
+tool tracks a stock ticker, a technology, a policy beat, or any subject a feed
+covers.
 
 ## Install
 
@@ -18,16 +20,39 @@ Define a topic, register an RSS source, provide a digest recipient and the API
 key for the default Gemini LLM provider, then run one poll:
 
 ```sh
-newswatch add-topic insurance --include insurance reinsurance --exclude sports
-newswatch add-source industry-news https://example.com/feed.xml \
-  --kind rss --topic insurance
+newswatch add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
+newswatch add-source korea-herald https://www.koreaherald.com/rss/newsAll \
+  --kind rss --topic markets
 export NEWSWATCH_DIGEST_TO=you@example.com
 export GEMINI_API_KEY=your-api-key
 newswatch poll
 ```
 
+A topic matches on the feed's own language, so pair the keywords with the feed:
+English keywords for an English feed, Korean keywords for a Korean feed.
+
 Use `newswatch topics` and `newswatch sources` to inspect the registries. Run
 `newswatch --help` or `newswatch <command> --help` for all commands and options.
+
+## News feeds
+
+Any valid RSS/Atom feed works as a source. A representative set of verified
+Korean feeds is below; the full list, grouped by section and marked with which
+were live at verification, is in [docs/korean-news-rss.md](docs/korean-news-rss.md).
+A site with no feed can still be followed with a `--kind crawl` source.
+
+| Outlet | Beat | Feed URL |
+|--------|------|----------|
+| 연합뉴스 (Yonhap) | wire | `https://www.yna.co.kr/rss/news.xml` |
+| 한국경제 (Hankyung) | economy | `https://www.hankyung.com/feed/all-news` |
+| 조선비즈 (ChosunBiz) | economy | `https://biz.chosun.com/arc/outboundfeeds/rss/?outputType=xml` |
+| 매일경제 (Maeil) | economy | `https://www.mk.co.kr/rss/30000001/` |
+| 이데일리 (Edaily) | economy | `http://rss.edaily.co.kr/edaily_news.xml` |
+| 머니투데이 (MoneyToday) | economy | `http://rss.mt.co.kr/mt_news.xml` |
+| 전자신문 (ETNews) | tech | `https://rss.etnews.com/Section901.xml` |
+| 지디넷코리아 (ZDNet Korea) | tech | `https://feeds.feedburner.com/zdkorea` |
+| The Korea Herald | English | `https://www.koreaherald.com/rss/newsAll` |
+| The Korea Times | English | `https://feed.koreatimes.co.kr/k/allnews.xml` |
 
 ## Configuration files
 
@@ -42,13 +67,13 @@ summary contains any include keyword and no exclude keyword. An empty
 
 ```toml
 [[topic]]
-name = "insurance"
-includes = ["insurance", "reinsurance", "underwriting"]
+name = "markets"
+includes = ["stocks", "Fed", "interest rate", "earnings"]
 excludes = ["sports"]
 
 [[topic]]
-name = "regulation"
-includes = ["regulator", "solvency", "capital requirement"]
+name = "semiconductors"
+includes = ["chip", "foundry", "HBM", "TSMC", "Nvidia"]
 ```
 
 `sources.toml` contains RSS or crawl sources. `topics` selects the topic filters
@@ -57,16 +82,16 @@ should be retained without keyword filtering.
 
 ```toml
 [[source]]
-name = "industry-feed"
+name = "korea-herald"
 kind = "rss"
-url = "https://example.com/feed.xml"
-topics = ["insurance", "regulation"]
+url = "https://www.koreaherald.com/rss/newsAll"
+topics = ["markets", "semiconductors"]
 
 [[source]]
-name = "regulator-news"
+name = "exchange-notices"
 kind = "crawl"
-url = "https://example.gov/news"
-topics = ["regulation"]
+url = "https://example.com/markets/notices"
+topics = ["markets"]
 item = "article.news-item"
 title = "h2"
 link = "a@href"
