@@ -12,7 +12,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from newswatch.feed import FeedItem
+from newswatch.feed import FeedItem, normalize_date
 from newswatch.http import get
 from newswatch.robots import RobotsGate
 from newswatch.sources import Source
@@ -47,13 +47,13 @@ def extract_items(html: str, source: Source) -> tuple[FeedItem, ...]:
         if not link:
             continue
         title = _select_value(row, source.title) or ""
-        published = _select_value(row, source.date) if source.date else ""
+        raw_date = _select_value(row, source.date) if source.date else ""
         items.append(FeedItem(
             title=title,
             link=link,
             guid=link,   # a listing rarely exposes a stable id; the link is the dedup key
             summary="",
-            published=published or "",
+            published=normalize_date(raw_date),   # to ISO-8601, or "" when unparseable
             source_name=source.name,
         ))
     return tuple(items)

@@ -6,16 +6,18 @@ rest of the pipeline sees one shape. A crawl source produces the same ``FeedItem
 from __future__ import annotations
 
 import calendar
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 import feedparser
+from feedparser.datetimes import _parse_date
 
 from newswatch.http import get
 from newswatch.robots import RobotsGate
 from newswatch.sources import Source
 
-__all__ = ["FeedItem", "parse_feed", "fetch_feed"]
+__all__ = ["FeedItem", "parse_feed", "fetch_feed", "normalize_date"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,12 +73,25 @@ def parse_feed(text: str, source_name: str) -> tuple[FeedItem, ...]:
     return tuple(items)
 
 
+def normalize_date(text: str) -> str:
+    """Parse an arbitrary date string (RSS, W3CDTF/ISO, RFC822, ...) to the canonical
+    ISO-8601 UTC form, or "" when it is empty or feedparser cannot parse it. Shared so
+    a crawl source's raw date text normalizes to the same form ``_published`` produces
+    for a feed entry."""
+    return _iso8601(_parse_date(text)) if text else ""
+
+
 def _published(entry: object) -> str:
     """An entry's published time as ISO-8601 UTC, or "" when absent. feedparser
     exposes a parsed ``published_parsed`` (a UTC ``time.struct_time``) when it could
     read any of the date fields; we format that one canonical form."""
     struct = getattr(entry, "get", lambda *_: None)("published_parsed") \
         or getattr(entry, "get", lambda *_: None)("updated_parsed")
+    return _iso8601(struct)
+
+
+def _iso8601(struct: time.struct_time | None) -> str:
+    """Format a UTC ``time.struct_time`` as ``YYYY-MM-DDTHH:MM:SSZ``; "" when None."""
     if not struct:
         return ""
     return datetime.fromtimestamp(calendar.timegm(struct), UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
