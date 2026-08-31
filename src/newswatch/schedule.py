@@ -52,14 +52,40 @@ def install_poll(every_minutes: int) -> str:
     the installed cron line.
 
     Raises:
-        ScheduleError: no ``crontab`` command is available, or the crontab could not be
-            read or written.
+        ScheduleError: the interval is not expressible as a simple cron step, no
+            ``crontab`` command is available, or the crontab could not be read or
+            written.
     """
-    line = f"*/{every_minutes} * * * * {' '.join(resolve_poll_command())} {_MARKER}"
+    line = f"{_cron_time_spec(every_minutes)} {' '.join(resolve_poll_command())} {_MARKER}"
     lines = [ln for ln in _read_crontab() if _MARKER not in ln]
     lines.append(line)
     _write_crontab(lines)
     return line
+
+
+def _cron_time_spec(every_minutes: int) -> str:
+    """The 5-field cron time spec that fires every ``every_minutes``. cron step fields
+    are per-unit (minute 0-59, hour 0-23, day-of-month 1-31), so an interval is
+    expressible only as a sub-hour minute step, a whole number of hours below a day, or
+    a whole number of days. A step that overflows its field silently collapses --
+    ``*/120`` in the minute field fires only at minute 0, i.e. hourly -- so reject an
+    interval that does not fit rather than mis-schedule it.
+
+    Raises:
+        ScheduleError: the interval cannot be expressed as a simple cron step.
+    """
+    if every_minutes < 60:
+        return f"*/{every_minutes} * * * *"
+    if every_minutes % 60 == 0:
+        hours = every_minutes // 60
+        if hours < 24:
+            return f"0 */{hours} * * *"
+        if hours % 24 == 0 and (days := hours // 24) <= 31:
+            return f"0 0 */{days} * *"
+    raise ScheduleError(
+        f"interval of {every_minutes} minutes is not expressible as a simple cron "
+        f"schedule; use a sub-hour interval, a whole number of hours below 24, or "
+        f"whole days up to 31")
 
 
 def remove_poll() -> bool:
