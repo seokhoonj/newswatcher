@@ -24,6 +24,29 @@ def test_make_llm_client_construction_error_hides_key(monkeypatch, tmp_path):
     with pytest.raises(LLMError) as excinfo:
         _llm.make_llm_client(max_tokens=100, action="summarizing")
     assert "SECRET-KEY-123" not in str(excinfo.value)
+    # The chained cause must also be scrubbed: logging.exception formats the whole
+    # __cause__/__context__ chain, so a raw key there defeats the redaction.
+    assert "SECRET-KEY-123" not in str(excinfo.value.__cause__)
+
+
+def test_scrub_exception_scrubs_the_whole_cause_chain(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")
+    # A provider error (ThinchatError) whose own cause (a transport error) embeds the
+    # key in a URL -- the realistic Gemini shape.
+    try:
+        try:
+            raise ValueError("GET https://api?key=SECRET-KEY-123 failed")
+        except ValueError as transport:
+            raise ThinchatError("provider call failed") from transport
+    except ThinchatError as err:
+        scrubbed = _llm.scrub_exception(err)
+    chain = []
+    node: BaseException | None = scrubbed
+    while node is not None:
+        chain.append(str(node))
+        node = node.__cause__ or node.__context__
+    assert not any("SECRET-KEY-123" in link for link in chain)
 
 
 def test_make_llm_client_uses_credentials_file(monkeypatch, tmp_path):

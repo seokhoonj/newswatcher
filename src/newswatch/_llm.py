@@ -17,7 +17,7 @@ from newswatch import credentials
 from newswatch.errors import LLMError, NewswatchError
 
 __all__ = ["DEFAULT_PROVIDER", "PROVIDERS", "make_llm_client", "scrub_secrets",
-           "validate_provider"]
+           "scrub_exception", "validate_provider"]
 
 DEFAULT_PROVIDER = "gemini"
 _MAX_RETRIES = 6
@@ -55,6 +55,28 @@ def scrub_secrets(text: str) -> str:
     return text
 
 
+def scrub_exception(err: BaseException) -> BaseException:
+    """Scrub any resolvable provider key from ``err`` and its whole ``__cause__`` /
+    ``__context__`` chain, in place, then return ``err``.
+
+    ``scrub_secrets`` only cleans the message we build; a caller that does
+    ``logging.exception`` (or lets the error propagate to a traceback) prints the entire
+    chained cause, where a provider library -- or the transport error beneath it, which
+    Gemini spells with the key in a URL query -- still carries the raw key. Walking the
+    chain and rewriting each exception's ``args`` makes the redaction hold no matter how
+    the error is later rendered. Returns ``err`` so it reads as
+    ``raise LLMError(...) from scrub_exception(err)``.
+    """
+    seen: set[int] = set()
+    node: BaseException | None = err
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        if node.args:
+            node.args = tuple(scrub_secrets(a) if isinstance(a, str) else a for a in node.args)
+        node = node.__cause__ or node.__context__
+    return err
+
+
 def make_llm_client(
     provider: str = DEFAULT_PROVIDER, *, model: str | None = None,
     api_key: str | None = None, max_tokens: int, action: str,
@@ -82,4 +104,6 @@ def make_llm_client(
         return make_client(provider, model=model, api_key=key,
                            max_tokens=max_tokens, max_retries=_MAX_RETRIES)
     except ThinchatError as err:
-        raise LLMError(f"{action} could not start {provider}: {scrub_secrets(str(err))}") from err
+        raise LLMError(
+            f"{action} could not start {provider}: {scrub_secrets(str(err))}"
+        ) from scrub_exception(err)

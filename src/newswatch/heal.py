@@ -17,7 +17,7 @@ from pathlib import Path
 import requests
 from thinchat.errors import ThinchatError
 
-from newswatch._llm import DEFAULT_PROVIDER, make_llm_client, scrub_secrets
+from newswatch._llm import DEFAULT_PROVIDER, make_llm_client, scrub_exception, scrub_secrets
 from newswatch.crawl import extract_items
 from newswatch.errors import HealError, NewswatchError
 from newswatch.http import get
@@ -135,7 +135,9 @@ def propose_selectors(
         try:
             reply = client.complete(_truncate(html), system=_SYSTEM).strip()
         except ThinchatError as err:
-            raise HealError(f"selector proposal failed: {scrub_secrets(str(err))}") from err
+            raise HealError(
+                f"selector proposal failed: {scrub_secrets(str(err))}"
+            ) from scrub_exception(err)
     return _parse_selectors(reply)
 
 
