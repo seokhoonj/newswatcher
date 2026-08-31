@@ -89,7 +89,12 @@ def _cron_time_spec(every_minutes: int) -> str:
 
 
 def remove_poll() -> bool:
-    """Remove the newswatch poll line; return whether one was present."""
+    """Remove the newswatch poll line; return whether one was present.
+
+    Raises:
+        ScheduleError: no ``crontab`` command is available, or the crontab could not be
+            read or written.
+    """
     current = _read_crontab()
     kept = [ln for ln in current if _MARKER not in ln]
     if len(kept) == len(current):
@@ -99,7 +104,12 @@ def remove_poll() -> bool:
 
 
 def poll_status() -> str | None:
-    """The installed newswatch cron line, or None when not installed."""
+    """The installed newswatch cron line, or None when not installed.
+
+    Raises:
+        ScheduleError: no ``crontab`` command is available, or the crontab could not be
+            read.
+    """
     for line in _read_crontab():
         if _MARKER in line:
             return line

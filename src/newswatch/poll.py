@@ -50,7 +50,9 @@ def poll_sources(
 ) -> PollReport:
     """Run the pipeline once over ``sources``. Persists each collected article to
     ``store`` (when given) and advances ``state`` in place; the caller writes state and
-    mails the digest. ``summarize`` is injectable for tests."""
+    mails the digest. ``summarize`` is injectable for tests. Does not raise for a source
+    or article failure -- those are recorded in the report's ``skipped`` and the pass
+    continues -- so a caller need not guard it against a single bad source."""
     collected: list[Article] = []
     empty: list[str] = []
     skipped: list[tuple[str, str]] = []

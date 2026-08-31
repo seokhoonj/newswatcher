@@ -147,8 +147,10 @@ def _truncate(html: str, limit: int = 12000) -> str:
 
 
 def _fetch_listing(source: Source, gate: RobotsGate | None, session: requests.Session | None) -> str:
-    """Fetch the listing page (robots-gated). Seam for tests."""
+    """Fetch the listing page (robots-gated). Seam for tests, which stub it and so may
+    pass gate=None; the live path always has a gate."""
     from newswatch.http import get
 
-    assert gate is not None  # a real gate is required off the test path
+    if gate is None:
+        raise HealError(f"cannot heal {source.name!r}: a robots gate is required")
     return get(source.url, gate, session=session)

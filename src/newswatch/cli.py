@@ -238,30 +238,30 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"newswatch {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    add_topic = sub.add_parser("add-topic", help="define a topic")
-    add_topic.add_argument("name")
-    add_topic.add_argument("--include", nargs="*", default=[], metavar="WORD")
-    add_topic.add_argument("--exclude", nargs="*", default=[], metavar="WORD")
-    add_topic.set_defaults(run=_run_add_topic)
+    add_topic_cmd = sub.add_parser("add-topic", help="define a topic")
+    add_topic_cmd.add_argument("name")
+    add_topic_cmd.add_argument("--include", nargs="*", default=[], metavar="WORD")
+    add_topic_cmd.add_argument("--exclude", nargs="*", default=[], metavar="WORD")
+    add_topic_cmd.set_defaults(run=_run_add_topic)
 
     topics = sub.add_parser("topics", help="list topics")
     topics.set_defaults(run=_run_topics)
 
-    add_source = sub.add_parser("add-source", help="register a source")
-    add_source.add_argument("name")
-    add_source.add_argument("url")
-    add_source.add_argument("--kind", choices=("rss", "crawl"), default="rss")
-    add_source.add_argument("--topic", action="append", default=[], metavar="NAME",
-                            help="a topic this source subscribes to (repeatable)")
-    add_source.add_argument("--keep-all", action="store_true", dest="keep_all",
-                            help="keep every article (a trade paper); skip the keyword filter")
-    add_source.add_argument("--item", default=None, help="crawl: article-row selector")
-    add_source.add_argument("--title", default=None, help="crawl: title selector")
-    add_source.add_argument("--link", default=None, help="crawl: link selector (css@href)")
-    add_source.add_argument("--date", default=None, help="crawl: date selector (optional)")
-    add_source.add_argument("--body-selector", default=None, dest="body_selector",
-                            help="override generic body extraction for this source")
-    add_source.set_defaults(run=_run_add_source)
+    add_source_cmd = sub.add_parser("add-source", help="register a source")
+    add_source_cmd.add_argument("name")
+    add_source_cmd.add_argument("url")
+    add_source_cmd.add_argument("--kind", choices=("rss", "crawl"), default="rss")
+    add_source_cmd.add_argument("--topic", action="append", default=[], metavar="NAME",
+                                help="a topic this source subscribes to (repeatable)")
+    add_source_cmd.add_argument("--keep-all", action="store_true", dest="keep_all",
+                                help="keep every article (a trade paper); skip the keyword filter")
+    add_source_cmd.add_argument("--item", default=None, help="crawl: article-row selector")
+    add_source_cmd.add_argument("--title", default=None, help="crawl: title selector")
+    add_source_cmd.add_argument("--link", default=None, help="crawl: link selector (css@href)")
+    add_source_cmd.add_argument("--date", default=None, help="crawl: date selector (optional)")
+    add_source_cmd.add_argument("--body-selector", default=None, dest="body_selector",
+                                help="override generic body extraction for this source")
+    add_source_cmd.set_defaults(run=_run_add_source)
 
     sources = sub.add_parser("sources", help="list sources")
     sources.set_defaults(run=_run_sources)
