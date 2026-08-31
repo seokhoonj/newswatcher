@@ -27,6 +27,58 @@ def test_watch_clamps_negative_sleep(monkeypatch):
     assert slept == [0.0]   # clamped to zero, never negative
 
 
+def test_watch_survives_a_transient_poll_error(monkeypatch):
+    # A DigestError/LLMError/ConfigError from one poll must not kill the watcher: the
+    # resilience design ("re-collect and re-send next run") depends on there being a next
+    # run, which watch only has if it stays in the loop.
+    from newswatch.errors import LLMError
+    calls = []
+
+    class _Stop(Exception):
+        pass
+
+    def fake_poll(a):
+        calls.append(1)
+        if len(calls) == 1:
+            raise LLMError("transient provider blip")
+        raise _Stop   # break the loop on the 2nd tick
+
+    monkeypatch.setattr(cli, "_run_poll", fake_poll)
+    monkeypatch.setattr("time.monotonic", lambda: 0.0)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+    with pytest.raises(_Stop):
+        cli._run_watch(argparse.Namespace(every=None))
+    assert len(calls) == 2   # it continued to a 2nd poll after the 1st raised
+
+
+def test_heal_continues_past_a_failing_source(monkeypatch, capsys):
+    # The package invariant "one bad source must not stop the rest" must hold for the
+    # manual heal command too, not just the in-poll healer.
+    from newswatch.errors import FetchError
+    from newswatch.heal import HealResult
+    from newswatch.sources import Source
+
+    srcs = (Source("a", kind="crawl", url="u", item="i", title="t", link="l"),
+            Source("b", kind="crawl", url="u", item="i", title="t", link="l"))
+    monkeypatch.setattr(cli, "load_sources", lambda: srcs)
+    monkeypatch.setattr(cli, "_resolve_llm_choice", lambda a: ("gemini", None))
+    seen = []
+
+    def fake_heal(source, **kwargs):
+        seen.append(source.name)
+        if source.name == "a":
+            raise FetchError("listing returned 500")
+        return HealResult(source_name="b", old={}, new={}, applied=True, note="repaired 'b'")
+
+    monkeypatch.setattr(cli, "heal_source", fake_heal)
+    code = cli._run_heal(argparse.Namespace(dry_run=False))
+    assert code == 0
+    assert seen == ["a", "b"]   # b was still attempted after a failed
+    captured = capsys.readouterr()
+    assert "repaired 'b'" in captured.out
+    assert "a" in captured.err   # the failure was reported to stderr, not fatal
+
+
 def _xdg(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))

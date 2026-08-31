@@ -182,7 +182,12 @@ def _run_watch(args: argparse.Namespace) -> int:
     print(f"watching every {every} min; Ctrl-C to stop", file=sys.stderr)
     next_tick = time.monotonic()
     while True:
-        _run_poll(args)
+        try:
+            _run_poll(args)
+        except NewswatchError as err:
+            # One transient failure (a mail/LLM/config error) must not end the watch --
+            # the state was not written, so the next tick re-collects and re-sends.
+            print(f"newswatch: {err}", file=sys.stderr)
         next_tick = max(next_tick + every * 60, time.monotonic())
         time.sleep(max(0.0, next_tick - time.monotonic()))   # a poll that overran sleeps 0
 
@@ -202,8 +207,13 @@ def _run_heal(args: argparse.Namespace) -> int:
     for source in load_sources():
         if source.kind != "crawl":
             continue
-        result = heal_source(source, gate=gate, apply=not args.dry_run,
-                             provider=provider, model=model)
+        try:
+            result = heal_source(source, gate=gate, apply=not args.dry_run,
+                                 provider=provider, model=model)
+        except NewswatchError as err:
+            # One source's failure must not stop the rest (the package invariant).
+            print(f"newswatch: healing {source.name} failed: {err}", file=sys.stderr)
+            continue
         if result is not None:
             print(result.note)
     return 0
