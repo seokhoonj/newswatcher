@@ -73,3 +73,29 @@ def test_heal_returns_none_when_source_healthy(monkeypatch):
                      item="ul.new li.row", title="a.tit", link="a.tit@href")
     monkeypatch.setattr(heal, "_fetch_listing", lambda s, g, sess: HTML)
     assert heal.heal_source(healthy, gate=None) is None
+
+
+def test_heal_empty_sources_clears_counter_on_apply(monkeypatch):
+    st = State()
+    st.note_empty("무RSS")
+    st.note_empty("무RSS")   # at the heal threshold
+    applied = heal.HealResult(source_name="무RSS", old={}, new={"item": "x"},
+                              applied=True, note="repaired")
+    monkeypatch.setattr(heal, "heal_source", lambda *a, **k: applied)
+    notes = heal.heal_empty_sources((BROKEN,), gate=None, state=st)
+    assert notes == ("repaired",)
+    assert "무RSS" not in st.empty_polls_by_source   # counter cleared
+
+
+def test_heal_empty_sources_reports_failure_without_aborting(monkeypatch):
+    st = State()
+    st.note_empty("무RSS")
+    st.note_empty("무RSS")
+
+    def _boom(*a, **k):
+        raise HealError("nope")
+
+    monkeypatch.setattr(heal, "heal_source", _boom)
+    notes = heal.heal_empty_sources((BROKEN,), gate=None, state=st)
+    assert notes and "무RSS" in notes[0]
+    assert st.empty_polls_by_source["무RSS"] == 2   # not cleared on failure

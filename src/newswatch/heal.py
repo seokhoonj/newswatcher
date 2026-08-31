@@ -19,12 +19,13 @@ from thinchat.errors import ThinchatError
 
 from newswatch._llm import DEFAULT_PROVIDER, make_llm_client, scrub_secrets
 from newswatch.crawl import extract_items
-from newswatch.errors import HealError
+from newswatch.errors import HealError, NewswatchError
 from newswatch.robots import RobotsGate
 from newswatch.sources import Source, update_selectors
 from newswatch.state import State
 
-__all__ = ["HEAL_THRESHOLD", "HealResult", "needs_heal", "heal_source", "propose_selectors"]
+__all__ = ["HEAL_THRESHOLD", "HealResult", "needs_heal", "heal_source",
+           "heal_empty_sources", "propose_selectors"]
 
 HEAL_THRESHOLD = 2
 _MIN_VALID_ROWS = 2
@@ -91,6 +92,31 @@ def heal_source(
     diff = ", ".join(f"{k}: {old.get(k, '-')!r} -> {v!r}" for k, v in changes.items())
     return HealResult(source_name=source.name, old=old, new=changes, applied=apply,
                       note=f"repaired {source.name!r} selectors ({diff})")
+
+
+def heal_empty_sources(
+    sources: tuple[Source, ...], *, gate: RobotsGate, state: State,
+    session: requests.Session | None = None,
+    provider: str = DEFAULT_PROVIDER, model: str | None = None,
+) -> tuple[str, ...]:
+    """Heal each crawl source that has hit the empty-poll threshold; return the notes
+    for the digest/log. A heal failure for one source is reported but does not abort the
+    run, and a source's empty-poll counter is cleared once its repair is applied."""
+    notes: list[str] = []
+    for source in sources:
+        if not needs_heal(source, state):
+            continue
+        try:
+            result = heal_source(source, gate=gate, session=session, apply=True,
+                                 provider=provider, model=model)
+        except NewswatchError as err:
+            notes.append(f"heal of {source.name!r} failed: {err}")
+            continue
+        if result is not None:
+            notes.append(result.note)
+            if result.applied:
+                state.clear_empty(source.name)
+    return tuple(notes)
 
 
 def propose_selectors(
