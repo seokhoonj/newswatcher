@@ -62,15 +62,16 @@ def test_load_skips_a_file_missing_required_fields(tmp_path):
     assert [a.guid for a in store.load()] == ["a1"]
 
 
-def test_load_raises_on_a_forward_schema_version(tmp_path):
+def test_load_skips_a_forward_schema_version(tmp_path):
     store = FileStore(tmp_path)
+    store.save(_article("a1", "2026-08-15T00:00:00Z"))
     envelope = {"schema_version": 999, "saved_at": "2026-08-15T00:00:00Z",
                 "article": {}}
-    (tmp_path / "articles").mkdir(parents=True, exist_ok=True)
     (tmp_path / "articles" / "future.json").write_text(json.dumps(envelope),
                                                        encoding="utf-8")
-    with pytest.raises(CorpusError):
-        store.load()
+    # A file written by a newer newswatch is read as absent, like a corrupt file, so
+    # one forward-schema file does not sink the whole archive read.
+    assert [a.guid for a in store.load()] == ["a1"]
 
 
 def test_load_raises_on_an_unreadable_file(tmp_path, monkeypatch):

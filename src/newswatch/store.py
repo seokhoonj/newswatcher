@@ -78,11 +78,11 @@ class FileStore:
         """Return archived articles oldest-first, optionally narrowed to a ``topic``
         tag and a half-open date range ``[since, until)`` compared against ``published``
         as ISO-8601 strings (a bare ``YYYY-MM-DD`` bound works by prefix). A corrupt
-        file reads as absent.
+        or forward-schema file reads as absent, so one bad file does not sink the read.
 
         Raises:
             CorpusError: a stored file could not be read (an I/O failure, as opposed to
-                a corrupt file, which is skipped).
+                a corrupt or forward-schema file, which is skipped).
         """
         rows: list[tuple[str, Article]] = []
         for path in self._dir.glob("*.json"):
@@ -123,9 +123,7 @@ def _read_article(path: Path) -> tuple[Article | None, str]:
     if not isinstance(envelope, dict):
         return None, ""
     if envelope.get("schema_version") not in (None, _SCHEMA_VERSION):
-        raise CorpusError(
-            f"unsupported archive schema_version {envelope.get('schema_version')!r}; "
-            f"this newswatch reads version {_SCHEMA_VERSION}")
+        return None, ""   # written by a newer newswatch; read as absent, not fatal
     body = envelope.get("article")
     saved_at = envelope.get("saved_at")
     if not isinstance(body, dict) or not isinstance(saved_at, str):
