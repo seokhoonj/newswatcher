@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from newswatch.errors import CorpusError
+from newswatch.errors import ArchiveError
 from newswatch.store import Article, FileStore
 
 
@@ -82,5 +82,5 @@ def test_load_raises_on_an_unreadable_file(tmp_path, monkeypatch):
         raise OSError("permission denied")
 
     monkeypatch.setattr("pathlib.Path.read_text", _boom)
-    with pytest.raises(CorpusError):
+    with pytest.raises(ArchiveError):
         store.load()

@@ -83,12 +83,12 @@ def _poll_returning_one(monkeypatch):
 
 
 def test_poll_does_not_persist_state_when_mail_fails(monkeypatch, tmp_path):
-    from newswatch.errors import NotifyError
+    from newswatch.errors import DigestError
     _xdg(monkeypatch, tmp_path)
     writes = _poll_returning_one(monkeypatch)
 
     def _boom(*a, **k):
-        raise NotifyError("smtp down")
+        raise DigestError("smtp down")
 
     monkeypatch.setattr(cli, "send_digest", _boom)
     assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1

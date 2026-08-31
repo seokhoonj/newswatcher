@@ -16,7 +16,7 @@ from pathlib import Path
 
 from newswatch._atomic import write_bytes_atomic
 from newswatch.config import data_dir
-from newswatch.errors import CorpusError
+from newswatch.errors import ArchiveError
 
 __all__ = ["Article", "FileStore", "archive_root"]
 
@@ -62,7 +62,7 @@ class FileStore:
         """Store ``article`` keyed by its guid; a re-save overwrites in place.
 
         Raises:
-            CorpusError: the article could not be written (an I/O failure).
+            ArchiveError: the article could not be written (an I/O failure).
         """
         path = self._dir / f"{_key(article.guid)}.json"
         envelope = {
@@ -71,7 +71,7 @@ class FileStore:
             "article": asdict(article),
         }
         payload = json.dumps(envelope, ensure_ascii=False, indent=2).encode("utf-8")
-        write_bytes_atomic(path, payload, CorpusError)
+        write_bytes_atomic(path, payload, ArchiveError)
 
     def load(self, *, topic: str | None = None, since: str | None = None,
              until: str | None = None) -> tuple[Article, ...]:
@@ -81,7 +81,7 @@ class FileStore:
         or forward-schema file reads as absent, so one bad file does not sink the read.
 
         Raises:
-            CorpusError: a stored file could not be read (an I/O failure, as opposed to
+            ArchiveError: a stored file could not be read (an I/O failure, as opposed to
                 a corrupt or forward-schema file, which is skipped).
         """
         rows: list[tuple[str, Article]] = []
@@ -115,7 +115,7 @@ def _read_article(path: Path) -> tuple[Article | None, str]:
     except FileNotFoundError:
         return None, ""
     except OSError as err:
-        raise CorpusError(f"could not read {path}: {err}") from err
+        raise ArchiveError(f"could not read {path}: {err}") from err
     try:
         envelope = json.loads(text)
     except json.JSONDecodeError:

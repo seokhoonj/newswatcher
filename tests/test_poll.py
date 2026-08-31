@@ -1,4 +1,4 @@
-from newswatch.errors import CorpusError, LLMError
+from newswatch.errors import ArchiveError, LLMError
 from newswatch.feed import FeedItem
 from newswatch.poll import poll_sources
 from newswatch.robots import RobotsGate
@@ -94,7 +94,7 @@ def test_poll_degrades_on_store_error(tmp_path, monkeypatch):
 
     class BadStore(FileStore):
         def save(self, article):
-            raise CorpusError("disk full")
+            raise ArchiveError("disk full")
 
     state = State()
     report = poll_sources((src,), (Topic("t"),), gate=_gate, state=state,

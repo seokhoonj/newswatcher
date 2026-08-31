@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Protocol, cast
 
-from newswatch.errors import NotifyError
+from newswatch.errors import DigestError
 from newswatch.store import Article
 
 __all__ = ["render_digest", "send_digest"]
@@ -50,7 +50,7 @@ def send_digest(
     alias). A no-op when there is nothing to report and no heal notes.
 
     Raises:
-        NotifyError: mailmail is missing, or it refused or failed the send.
+        DigestError: mailmail is missing, or it refused or failed the send.
     """
     if not articles and not heal_notes:
         return
@@ -59,9 +59,9 @@ def send_digest(
     try:
         mailmail.send(subject=subject, body=body, to=to, account=account)
     except mailmail.MailmailError as err:
-        raise NotifyError(f"could not send digest: {err}") from err
+        raise DigestError(f"could not send digest: {err}") from err
     except OSError as err:
-        raise NotifyError(f"network error sending digest: {err}") from err
+        raise DigestError(f"network error sending digest: {err}") from err
 
 
 def _group_by_topic(articles: tuple[Article, ...]) -> list[tuple[str, list[Article]]]:
@@ -87,7 +87,7 @@ def _load_mailmail() -> _MailmailModule:
     try:
         import mailmail
     except ImportError as err:
-        raise NotifyError(
+        raise DigestError(
             "the mailmail package is required to send digests but could not be imported; "
             "reinstall newswatch"
         ) from err

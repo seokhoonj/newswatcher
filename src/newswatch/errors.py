@@ -13,9 +13,9 @@ __all__ = [
     "SourceError",
     "TopicError",
     "FetchError",
-    "CorpusError",
+    "ArchiveError",
     "LLMError",
-    "NotifyError",
+    "DigestError",
     "ScheduleError",
     "HealError",
 ]
@@ -44,7 +44,7 @@ class FetchError(NewswatchError):
     disallowed the URL. Its message carries the URL and the underlying cause."""
 
 
-class CorpusError(NewswatchError):
+class ArchiveError(NewswatchError):
     """The article archive could not be read or written (an I/O failure), kept
     distinct from a corrupt file, which is treated as absent rather than raised."""
 
@@ -54,7 +54,7 @@ class LLMError(NewswatchError):
     error, or a reply of the wrong shape. Its message carries the underlying cause."""
 
 
-class NotifyError(NewswatchError):
+class DigestError(NewswatchError):
     """A digest could not be mailed: the ``mailmail`` package is missing, or it
     refused or failed the send. Its message carries the underlying cause."""
 
