@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from newswatch.article import fetch_body
+from newswatch.body import fetch_body
 from newswatch.crawl import crawl_items
 from newswatch.errors import NewswatchError
 from newswatch.feed import FeedItem, fetch_feed

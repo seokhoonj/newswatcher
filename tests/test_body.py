@@ -1,4 +1,4 @@
-from newswatch.article import extract_body
+from newswatch.body import extract_body
 from newswatch.sources import Source
 
 PAGE = """<html><body><nav>menu</nav>
