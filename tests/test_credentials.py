@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -6,7 +7,7 @@ from newswatch import credentials
 from newswatch.errors import ConfigError
 
 
-def _write_credentials(tmp_path, payload):
+def _write_credentials(tmp_path: Path, payload: dict[str, object] | list[object] | str) -> Path:
     cfg = tmp_path / "newswatch"
     cfg.mkdir(parents=True, exist_ok=True)
     path = cfg / "credentials.json"
@@ -67,14 +68,17 @@ def test_non_utf8_file_raises(monkeypatch, tmp_path):
         credentials.secret("GEMINI_API_KEY")
 
 
-@pytest.mark.parametrize("payload", [[], {"GEMINI_API_KEY": 123}])
-def test_wrong_shape(monkeypatch, tmp_path, payload):
+def test_non_object_file_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, payload)
+    _write_credentials(tmp_path, [])   # valid JSON, but a list, not a name-to-key map
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    if isinstance(payload, list):
-        with pytest.raises(ConfigError):
-            credentials.secret("GEMINI_API_KEY")
-    else:
-        # a non-string value for the key reads as "no secret", not an error
-        assert credentials.secret("GEMINI_API_KEY") is None
+    with pytest.raises(ConfigError):
+        credentials.secret("GEMINI_API_KEY")
+
+
+@pytest.mark.parametrize("value", [123, None])
+def test_non_string_value_is_no_secret(monkeypatch, tmp_path, value):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    _write_credentials(tmp_path, {"GEMINI_API_KEY": value})
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert credentials.secret("GEMINI_API_KEY") is None

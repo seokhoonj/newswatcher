@@ -41,46 +41,96 @@ def test_unknown_command_exits_nonzero(monkeypatch, tmp_path):
     assert code != 0
 
 
-def _capture_summarizer(monkeypatch):
-    """Stub poll_sources to record the summarizer it is handed and report nothing."""
+def _capture_provider(monkeypatch):
+    """Run poll with the LLM calls stubbed, recording the provider and model the CLI
+    actually binds into the summarizer it hands to the pipeline (tested by invoking that
+    summarizer, not by inspecting how it was bound)."""
     from newswatch.poll import PollReport
+    from newswatch.summarize import Summary
     captured = {}
 
+    def fake_summarize(item, body, *, provider, model, api_key=None):
+        captured["provider"] = provider
+        captured["model"] = model
+        return Summary(title="t", link="u", text="x", model="m")
+
     def fake_poll_sources(*args, **kwargs):
-        captured["summarize"] = kwargs["summarize"]
+        kwargs["summarize"](object(), "body")   # invoke it to exercise the binding
         return PollReport((), (), ())
 
+    monkeypatch.setattr(cli, "summarize_article", fake_summarize)
     monkeypatch.setattr(cli, "poll_sources", fake_poll_sources)
     return captured
 
 
-def test_poll_provider_flag_binds_summarizer(monkeypatch, tmp_path):
+def test_poll_binds_provider_and_model_from_flags(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
-    captured = _capture_summarizer(monkeypatch)
-    code = cli.main(["poll", "--no-mail", "--no-heal", "--no-store",
-                     "--provider", "openai", "--model", "gpt-x"])
-    assert code == 0
-    assert captured["summarize"].keywords["provider"] == "openai"
-    assert captured["summarize"].keywords["model"] == "gpt-x"
+    captured = _capture_provider(monkeypatch)
+    assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store",
+                     "--provider", "openai", "--model", "gpt-x"]) == 0
+    assert captured == {"provider": "openai", "model": "gpt-x"}
 
 
-def test_poll_provider_from_setting(monkeypatch, tmp_path):
+def test_poll_provider_comes_from_environment_variable(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     monkeypatch.setenv("NEWSWATCH_LLM_PROVIDER", "claude")
-    captured = _capture_summarizer(monkeypatch)
-    code = cli.main(["poll", "--no-mail", "--no-heal", "--no-store"])
-    assert code == 0
-    assert captured["summarize"].keywords["provider"] == "claude"
+    captured = _capture_provider(monkeypatch)
+    assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
+    assert captured["provider"] == "claude"
 
 
-def test_poll_provider_defaults_to_gemini(monkeypatch, tmp_path):
+def test_poll_model_comes_from_setting(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("NEWSWATCH_LLM_MODEL", "configured-model")
+    captured = _capture_provider(monkeypatch)
+    assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
+    assert captured["model"] == "configured-model"
+
+
+def test_poll_empty_provider_flag_falls_through_to_setting(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCH_LLM_PROVIDER", "claude")
+    captured = _capture_provider(monkeypatch)
+    assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store", "--provider", ""]) == 0
+    assert captured["provider"] == "claude"
+
+
+def test_poll_defaults_to_gemini(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
     monkeypatch.delenv("NEWSWATCH_LLM_MODEL", raising=False)
-    captured = _capture_summarizer(monkeypatch)
-    code = cli.main(["poll", "--no-mail", "--no-heal", "--no-store"])
-    assert code == 0
+    captured = _capture_provider(monkeypatch)
+    assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
     from newswatch._llm import DEFAULT_PROVIDER
-    assert captured["summarize"].keywords["provider"] == DEFAULT_PROVIDER
-    assert captured["summarize"].keywords["model"] is None
+    assert captured["provider"] == DEFAULT_PROVIDER
+    assert captured["model"] is None
+
+
+def test_poll_unknown_provider_is_rejected(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
+    # a typo'd provider fails fast with a one-line error, even with nothing to summarize
+    assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store",
+                     "--provider", "gemninni"]) == 1
+
+
+def test_heal_threads_provider_to_heal_source(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
+    from newswatch.sources import Source
+    captured = {}
+
+    def fake_heal_source(source, *, gate, apply, provider, model, **kwargs):
+        captured["provider"] = provider
+        captured["model"] = model
+        return None
+
+    monkeypatch.setattr(cli, "load_sources",
+                        lambda: (Source("c", kind="crawl", url="u", topics=("t",),
+                                        item="li", title="a", link="a@href"),))
+    monkeypatch.setattr(cli, "heal_source", fake_heal_source)
+    monkeypatch.setattr(cli, "default_gate", lambda: None)
+    assert cli.main(["heal", "--provider", "openai", "--model", "gpt-x"]) == 0
+    assert captured == {"provider": "openai", "model": "gpt-x"}

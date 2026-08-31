@@ -16,9 +16,9 @@ import sys
 import time
 
 from newswatch import __version__, config
-from newswatch._llm import DEFAULT_PROVIDER
+from newswatch._llm import DEFAULT_PROVIDER, PROVIDERS
 from newswatch.digest import send_digest
-from newswatch.errors import NewswatchError
+from newswatch.errors import LLMError, NewswatchError
 from newswatch.feed import parse_feed
 from newswatch.heal import heal_source, needs_heal
 from newswatch.poll import poll_sources
@@ -43,12 +43,20 @@ _LLM_PROVIDER_ENV = "NEWSWATCH_LLM_PROVIDER"
 _LLM_MODEL_ENV = "NEWSWATCH_LLM_MODEL"
 
 
-def _llm_choice(args: argparse.Namespace) -> tuple[str, str | None]:
+def _resolve_llm_choice(args: argparse.Namespace) -> tuple[str, str | None]:
     """The LLM provider and model for this run: the ``--provider`` / ``--model`` flag
     wins, then the ``NEWSWATCH_LLM_PROVIDER`` / ``NEWSWATCH_LLM_MODEL`` setting, then the
     default provider and its default model. Same flag-over-setting precedence as ``--to``.
+
+    Raises:
+        LLMError: the resolved provider (from any source) is not one the backend knows --
+            caught here so a typo fails fast with the valid choices, not deep in a poll.
     """
     provider = args.provider or config.setting(_LLM_PROVIDER_ENV) or DEFAULT_PROVIDER
+    if provider not in PROVIDERS:
+        raise LLMError(
+            f"unknown LLM provider {provider!r}; choose one of {', '.join(sorted(PROVIDERS))}"
+        )
     model = args.model or config.setting(_LLM_MODEL_ENV)
     return provider, model
 
@@ -134,7 +142,7 @@ def _run_poll(args: argparse.Namespace) -> int:
     gate = default_gate()
     state = read_state()
     store = None if args.no_store else FileStore()
-    provider, model = _llm_choice(args)
+    provider, model = _resolve_llm_choice(args)
     summarize = functools.partial(summarize_article, provider=provider, model=model)
     report = poll_sources(sources, topics, gate=gate, state=state, store=store,
                           summarize=summarize)
@@ -177,7 +185,7 @@ def _run_articles(args: argparse.Namespace) -> int:
 
 def _run_heal(args: argparse.Namespace) -> int:
     gate = default_gate()
-    provider, model = _llm_choice(args)
+    provider, model = _resolve_llm_choice(args)
     for source in load_sources():
         if source.kind != "crawl":
             continue
@@ -304,7 +312,7 @@ def _add_poll_flags(parser: argparse.ArgumentParser) -> None:
 
 def _add_llm_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--provider", default=None,
-                        help="LLM provider for summaries and healing (default gemini)")
+                        help=f"LLM provider for summaries and healing (default {DEFAULT_PROVIDER})")
     parser.add_argument("--model", default=None, help="LLM model for the chosen provider")
 
 

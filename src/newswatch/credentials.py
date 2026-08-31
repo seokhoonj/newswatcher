@@ -72,10 +72,10 @@ def _secret_from_file(name: str) -> str | None:
         # named explicitly or it escapes this boundary as a bare traceback.
         raise ConfigError(f"could not read {path}: {err}") from err
     try:
-        store = json.loads(text)
+        secret_by_name = json.loads(text)
     except json.JSONDecodeError as err:
         raise ConfigError(f"{path} is not valid JSON: {err}") from err
-    if not isinstance(store, dict):
+    if not isinstance(secret_by_name, dict):
         raise ConfigError(f"{path} must contain a JSON object of name to key")
-    key = store.get(name)
+    key = secret_by_name.get(name)
     return key.strip() if isinstance(key, str) and key.strip() else None

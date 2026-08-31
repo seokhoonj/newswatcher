@@ -16,7 +16,7 @@ from thinchat.keys import ENV_BY_PROVIDER
 from newswatch import credentials
 from newswatch.errors import LLMError, NewswatchError
 
-__all__ = ["DEFAULT_PROVIDER", "make_llm_client", "scrub_secrets"]
+__all__ = ["DEFAULT_PROVIDER", "PROVIDERS", "make_llm_client", "scrub_secrets"]
 
 DEFAULT_PROVIDER = "gemini"
 _MAX_RETRIES = 6

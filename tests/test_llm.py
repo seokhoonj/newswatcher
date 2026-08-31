@@ -62,6 +62,34 @@ def test_make_llm_client_explicit_key_wins_over_file(monkeypatch, tmp_path):
     assert captured["api_key"] == "explicit"
 
 
+def test_make_llm_client_env_key_wins_over_file(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    cfg = tmp_path / "newswatch"
+    cfg.mkdir(parents=True)
+    (cfg / "credentials.json").write_text('{"GEMINI_API_KEY": "file-key"}', encoding="utf-8")
+    monkeypatch.setenv("GEMINI_API_KEY", "env-key")
+
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        _llm, "make_client",
+        lambda provider, *, model, api_key, max_tokens, max_retries: captured.setdefault("api_key", api_key),
+    )
+    _llm.make_llm_client(max_tokens=100, action="summarizing")
+    assert captured["api_key"] == "env-key"
+
+
+def test_make_llm_client_ollama_needs_no_key(monkeypatch, tmp_path):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    # ollama has no entry in ENV_BY_PROVIDER, so no key is required or looked up
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(
+        _llm, "make_client",
+        lambda provider, *, model, api_key, max_tokens, max_retries: captured.setdefault("api_key", api_key),
+    )
+    _llm.make_llm_client(provider="ollama", max_tokens=100, action="summarizing")
+    assert captured["api_key"] is None
+
+
 def test_make_llm_client_missing_key_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
