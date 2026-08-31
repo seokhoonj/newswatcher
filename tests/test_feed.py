@@ -8,6 +8,14 @@ def test_normalize_date_iso_and_rfc822_to_utc():
     assert normalize_date("2 hours ago") == ""                             # unparseable
     assert normalize_date("") == ""                                        # empty
 
+
+def test_normalize_date_dotted_and_slash_forms():
+    # The dotted/slash numeric stamps Korean news sites emit -- newswatch's target locale.
+    assert normalize_date("2026.08.15") == "2026-08-15T00:00:00Z"
+    assert normalize_date("2026.08.15 09:00") == "2026-08-15T09:00:00Z"
+    assert normalize_date("2026/08/15 09:00:00") == "2026-08-15T09:00:00Z"
+    assert normalize_date("2026/08/15") == "2026-08-15T00:00:00Z"
+
 RSS = """<?xml version="1.0"?>
 <rss version="2.0"><channel><title>보험신보 - 전체기사</title>
 <item><title>롯데손보 흑자전환</title>

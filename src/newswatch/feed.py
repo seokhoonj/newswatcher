@@ -75,12 +75,23 @@ def parse_feed(text: str, source_name: str) -> tuple[FeedItem, ...]:
     return tuple(items)
 
 
+# The dotted/slash numeric date stamps Korean news sites commonly render (feedparser
+# parsed these; the stdlib parsers below do not, so recover them explicitly). Locale-
+# independent -- all-numeric, no month names or AM/PM.
+_NUMERIC_FORMATS = (
+    "%Y.%m.%d %H:%M:%S", "%Y.%m.%d %H:%M", "%Y.%m.%d",
+    "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M", "%Y/%m/%d",
+)
+
+
 def normalize_date(text: str) -> str:
-    """Parse a date string (ISO-8601/W3CDTF, or RFC 822 as RSS ``pubDate`` spells it) to
-    the canonical ISO-8601 UTC form, or "" when it is empty or not one of those. Shared so
-    a crawl source's raw date text normalizes to the same form ``_published`` produces for
-    a feed entry. Parsed with the stdlib (``datetime`` + ``email.utils``) rather than a
-    feed library's private helper, so the package's import surface stays stable."""
+    """Parse a date string to the canonical ISO-8601 UTC form, or "" when it is empty or
+    unrecognized. Accepts ISO-8601/W3CDTF, RFC 822 (as an RSS ``pubDate`` spells it), and
+    the dotted/slash numeric stamps (``2026.08.15``, ``2026/08/15 09:00``) common on
+    Korean news sites. Shared so a crawl source's raw date text normalizes to the same
+    form ``_published`` produces for a feed entry. Parsed with the stdlib (``datetime`` +
+    ``email.utils``) rather than a feed library's private helper, so the package's import
+    surface stays stable."""
     text = text.strip()
     if not text:
         return ""
@@ -93,7 +104,8 @@ def normalize_date(text: str) -> str:
 
 
 def _parse_datetime(text: str) -> datetime | None:
-    """``text`` as a ``datetime`` if it is ISO-8601/W3CDTF or RFC 822, else None."""
+    """``text`` as a ``datetime`` if it is ISO-8601/W3CDTF, RFC 822, or a dotted/slash
+    numeric stamp, else None."""
     try:
         return datetime.fromisoformat(text)
     except ValueError:
@@ -101,7 +113,13 @@ def _parse_datetime(text: str) -> datetime | None:
     try:
         return parsedate_to_datetime(text)
     except (ValueError, TypeError):
-        return None
+        pass
+    for fmt in _NUMERIC_FORMATS:
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            pass
+    return None
 
 
 def _published(entry: Mapping[str, object]) -> str:
