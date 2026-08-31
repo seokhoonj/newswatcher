@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import calendar
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING
 
 import feedparser
-from feedparser.datetimes import _parse_date
 
 from newswatch.http import get
 from newswatch.robots import RobotsGate
@@ -75,20 +76,40 @@ def parse_feed(text: str, source_name: str) -> tuple[FeedItem, ...]:
 
 
 def normalize_date(text: str) -> str:
-    """Parse an arbitrary date string (RSS, W3CDTF/ISO, RFC822, ...) to the canonical
-    ISO-8601 UTC form, or "" when it is empty or feedparser cannot parse it. Shared so
-    a crawl source's raw date text normalizes to the same form ``_published`` produces
-    for a feed entry."""
-    return _iso8601(_parse_date(text)) if text else ""
+    """Parse a date string (ISO-8601/W3CDTF, or RFC 822 as RSS ``pubDate`` spells it) to
+    the canonical ISO-8601 UTC form, or "" when it is empty or not one of those. Shared so
+    a crawl source's raw date text normalizes to the same form ``_published`` produces for
+    a feed entry. Parsed with the stdlib (``datetime`` + ``email.utils``) rather than a
+    feed library's private helper, so the package's import surface stays stable."""
+    text = text.strip()
+    if not text:
+        return ""
+    moment = _parse_datetime(text)
+    if moment is None:
+        return ""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _published(entry: object) -> str:
-    """An entry's published time as ISO-8601 UTC, or "" when absent. feedparser
-    exposes a parsed ``published_parsed`` (a UTC ``time.struct_time``) when it could
-    read any of the date fields; we format that one canonical form."""
-    struct = getattr(entry, "get", lambda *_: None)("published_parsed") \
-        or getattr(entry, "get", lambda *_: None)("updated_parsed")
-    return _iso8601(struct)
+def _parse_datetime(text: str) -> datetime | None:
+    """``text`` as a ``datetime`` if it is ISO-8601/W3CDTF or RFC 822, else None."""
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError:
+        pass
+    try:
+        return parsedate_to_datetime(text)
+    except (ValueError, TypeError):
+        return None
+
+
+def _published(entry: Mapping[str, object]) -> str:
+    """An entry's published time as ISO-8601 UTC, or "" when absent. feedparser exposes a
+    parsed ``published_parsed`` (a UTC ``time.struct_time``) when it could read any of the
+    date fields; we format that one canonical form."""
+    struct = entry.get("published_parsed") or entry.get("updated_parsed")
+    return _iso8601(struct if isinstance(struct, time.struct_time) else None)
 
 
 def _iso8601(struct: time.struct_time | None) -> str:

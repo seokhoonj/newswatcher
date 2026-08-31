@@ -1,4 +1,12 @@
-from newswatch.feed import FeedItem, parse_feed
+from newswatch.feed import FeedItem, normalize_date, parse_feed
+
+
+def test_normalize_date_iso_and_rfc822_to_utc():
+    assert normalize_date("2026-08-15") == "2026-08-15T00:00:00Z"          # date-only
+    assert normalize_date("2026-08-15T09:00:00+09:00") == "2026-08-15T00:00:00Z"  # ISO offset -> UTC
+    assert normalize_date("Fri, 15 Aug 2026 09:00:00 +0900") == "2026-08-15T00:00:00Z"  # RFC 822
+    assert normalize_date("2 hours ago") == ""                             # unparseable
+    assert normalize_date("") == ""                                        # empty
 
 RSS = """<?xml version="1.0"?>
 <rss version="2.0"><channel><title>보험신보 - 전체기사</title>
