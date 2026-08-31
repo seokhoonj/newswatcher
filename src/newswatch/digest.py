@@ -22,7 +22,7 @@ _DIVIDER = "─" * 24
 class _MailmailModule(Protocol):
     MailmailError: type[Exception]
 
-    def send(self, *, subject: str, body: str, to: object, account: str | None = ...) -> object: ...
+    def send(self, *, subject: str, body: str, to: str, account: str | None = ...) -> object: ...
 
 
 def render_digest(articles: tuple[Article, ...], *, heal_notes: tuple[str, ...] = ()
@@ -43,7 +43,7 @@ def render_digest(articles: tuple[Article, ...], *, heal_notes: tuple[str, ...] 
 
 
 def send_digest(
-    articles: tuple[Article, ...], *, to: object, heal_notes: tuple[str, ...] = (),
+    articles: tuple[Article, ...], *, to: str, heal_notes: tuple[str, ...] = (),
     account: str | None = None,
 ) -> None:
     """Send the digest of ``articles`` to ``to`` (a mailmail address or address-book
