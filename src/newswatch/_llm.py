@@ -16,10 +16,23 @@ from thinchat.keys import ENV_BY_PROVIDER
 from newswatch import credentials
 from newswatch.errors import LLMError, NewswatchError
 
-__all__ = ["DEFAULT_PROVIDER", "PROVIDERS", "make_llm_client", "scrub_secrets"]
+__all__ = ["DEFAULT_PROVIDER", "PROVIDERS", "make_llm_client", "scrub_secrets",
+           "validate_provider"]
 
 DEFAULT_PROVIDER = "gemini"
 _MAX_RETRIES = 6
+
+
+def validate_provider(provider: str) -> None:
+    """Check that ``provider`` is a backend thinchat knows -- the single home for this
+    check, so the CLI's early validation and ``make_llm_client`` give the same message.
+
+    Raises:
+        LLMError: the provider is not a known backend.
+    """
+    if provider not in PROVIDERS:
+        raise LLMError(
+            f"unknown LLM provider {provider!r}; choose one of {', '.join(sorted(PROVIDERS))}")
 
 
 def scrub_secrets(text: str) -> str:
@@ -57,8 +70,7 @@ def make_llm_client(
         ConfigError: newswatch's ``credentials.json`` is present but unreadable, not JSON,
             or not a JSON object (propagated from ``credentials.secret``).
     """
-    if provider not in PROVIDERS:
-        raise LLMError(f"unknown LLM provider {provider!r}; choose one of {', '.join(PROVIDERS)}")
+    validate_provider(provider)
     env_name = ENV_BY_PROVIDER.get(provider)
     key = api_key if api_key is not None else (credentials.secret(env_name) if env_name else None)
     if env_name is not None and not key:

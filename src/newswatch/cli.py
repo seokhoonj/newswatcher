@@ -16,9 +16,9 @@ import sys
 import time
 
 from newswatch import __version__, config
-from newswatch._llm import DEFAULT_PROVIDER, PROVIDERS
+from newswatch._llm import DEFAULT_PROVIDER, validate_provider
 from newswatch.digest import send_digest
-from newswatch.errors import LLMError, NewswatchError
+from newswatch.errors import NewswatchError
 from newswatch.feed import parse_feed
 from newswatch.heal import heal_source, needs_heal
 from newswatch.poll import poll_sources
@@ -53,10 +53,7 @@ def _resolve_llm_choice(args: argparse.Namespace) -> tuple[str, str | None]:
             caught here so a typo fails fast with the valid choices, not deep in a poll.
     """
     provider = args.provider or config.setting(_LLM_PROVIDER_ENV) or DEFAULT_PROVIDER
-    if provider not in PROVIDERS:
-        raise LLMError(
-            f"unknown LLM provider {provider!r}; choose one of {', '.join(sorted(PROVIDERS))}"
-        )
+    validate_provider(provider)   # fail fast on a typo, with the valid choices
     model = args.model or config.setting(_LLM_MODEL_ENV)
     return provider, model
 
