@@ -120,7 +120,7 @@ def _str_list_pairs(raw: object) -> dict[str, list[str]]:
     out: dict[str, list[str]] = {}
     for key, value in raw.items():
         if isinstance(key, str) and isinstance(value, list):
-            out[key] = [g for g in value if isinstance(g, str)]
+            out[key] = [guid for guid in value if isinstance(guid, str)]
     return out
 
 

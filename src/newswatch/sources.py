@@ -32,7 +32,7 @@ SourceKind = Literal["rss", "crawl"]
 _KINDS: tuple[SourceKind, ...] = get_args(SourceKind)
 # The crawl selector fields, in the order they render; item/title/link are required
 # for a crawl source, date/body_selector are optional.
-_SELECTOR_FIELDS = ("item", "title", "link", "date", "body_selector")
+_SOURCE_SELECTOR_FIELDS = ("item", "title", "link", "date", "body_selector")
 _REQUIRED_CRAWL = ("item", "title", "link")
 
 
@@ -101,7 +101,7 @@ def update_selectors(name: str, selectors: dict[str, str], path: Path | None = N
             or the file is malformed or unwritable.
     """
     path = path or sources_path()
-    unknown = set(selectors) - set(_SELECTOR_FIELDS)
+    unknown = set(selectors) - set(_SOURCE_SELECTOR_FIELDS)
     if unknown:
         raise SourceError(f"not selector fields: {', '.join(sorted(unknown))}")
     sources = load_sources(path)
@@ -189,7 +189,7 @@ def _render(sources: tuple[Source, ...]) -> str:
             lines.append(f"topics = {_toml.array(s.topics)}")
         if s.keep_all:
             lines.append("keep_all = true")
-        for field_name in _SELECTOR_FIELDS:
+        for field_name in _SOURCE_SELECTOR_FIELDS:
             value = getattr(s, field_name)
             if value is not None:
                 lines.append(f"{field_name} = {_toml.quote(value)}")

@@ -38,7 +38,7 @@ _SYSTEM = (
     "(use the form 'selector@href' to read an href attribute); and the date element "
     "within a row (or empty string if none). No prose, no code fences."
 )
-_SELECTOR_KEYS = ("item", "title", "link", "date")
+_HEALABLE_SELECTOR_FIELDS = ("item", "title", "link", "date")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -87,7 +87,7 @@ def heal_source(
         return HealResult(
             source_name=source.name, old=old, new=proposed, applied=False,
             note=f"proposed selectors for {source.name!r} did not extract; not applied")
-    changes = {k: v for k, v in proposed.items() if k in _SELECTOR_KEYS and v}
+    changes = {k: v for k, v in proposed.items() if k in _HEALABLE_SELECTOR_FIELDS and v}
     if apply:
         update_selectors(source.name, changes, path)
     diff = ", ".join(f"{k}: {old.get(k, '-')!r} -> {v!r}" for k, v in changes.items())
@@ -153,7 +153,7 @@ def _validates(html: str, candidate: Source) -> bool:
 
 
 def _selectors_of(source: Source) -> dict[str, str]:
-    return {k: getattr(source, k) for k in _SELECTOR_KEYS if getattr(source, k)}
+    return {k: getattr(source, k) for k in _HEALABLE_SELECTOR_FIELDS if getattr(source, k)}
 
 
 def _parse_selectors(reply: str) -> dict[str, str]:
@@ -167,7 +167,7 @@ def _parse_selectors(reply: str) -> dict[str, str]:
         raise HealError(f"LLM did not return selector JSON: {reply[:120]!r}") from err
     if not isinstance(parsed, dict):
         raise HealError("LLM selector reply was not a JSON object")
-    return {k: str(parsed[k]) for k in _SELECTOR_KEYS if isinstance(parsed.get(k), str)}
+    return {k: str(parsed[k]) for k in _HEALABLE_SELECTOR_FIELDS if isinstance(parsed.get(k), str)}
 
 
 def _truncate(html: str, limit: int = 12000) -> str:

@@ -38,7 +38,8 @@ def render_digest(articles: tuple[Article, ...], *, heal_notes: tuple[str, ...] 
         body = "\n\n".join(_render_group(topic, group)
                            for topic, group in _group_by_topic(articles))
     if heal_notes:
-        body += "\n\n" + _DIVIDER + "\nselector repairs:\n" + "\n".join(f"- {n}" for n in heal_notes)
+        body += ("\n\n" + _DIVIDER + "\nselector repairs:\n"
+                 + "\n".join(f"- {note}" for note in heal_notes))
     return subject, body
 
 
@@ -68,11 +69,11 @@ def _group_by_topic(articles: tuple[Article, ...]) -> list[tuple[str, list[Artic
     """Group articles by their first topic tag, preserving first-appearance order. An
     article tagged with several topics is listed under its first tag only, so the
     digest does not repeat it."""
-    groups: dict[str, list[Article]] = {}
+    articles_by_topic: dict[str, list[Article]] = {}
     for article in articles:
         key = article.topics[0] if article.topics else "(untagged)"
-        groups.setdefault(key, []).append(article)
-    return list(groups.items())
+        articles_by_topic.setdefault(key, []).append(article)
+    return list(articles_by_topic.items())
 
 
 def _render_group(topic: str, articles: list[Article]) -> str:

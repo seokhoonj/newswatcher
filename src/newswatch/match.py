@@ -34,10 +34,10 @@ def topics_for(item: FeedItem, source: Source, topics: tuple[Topic, ...]) -> tup
     """The names of ``source``'s subscribed topics that ``item`` is tagged with. For a
     ``keep_all`` source that is every subscribed topic; otherwise only those whose
     keyword filter the item passes. Order follows the source's ``topics`` list."""
-    by_name = {topic.name: topic for topic in topics}
+    topic_by_name = {topic.name: topic for topic in topics}
     tagged = []
     for name in source.topics:
-        topic = by_name.get(name)
+        topic = topic_by_name.get(name)
         if topic is None:
             continue   # a source naming an undefined topic simply contributes no tag
         if source.keep_all or matches_topic(item, topic):
