@@ -31,7 +31,7 @@ _EMPTY_KEY = "empty_polls_by_source"
 _SEEN_CAP = 1024
 
 
-@dataclass
+@dataclass(slots=True)
 class State:
     """newswatch's between-run state. Both maps are mutable; a poll advances them in
     place and persists once through ``write_state``."""
