@@ -11,10 +11,12 @@ non-zero exit."""
 from __future__ import annotations
 
 import argparse
+import functools
 import sys
 import time
 
 from newswatch import __version__, config
+from newswatch._llm import DEFAULT_PROVIDER
 from newswatch.digest import send_digest
 from newswatch.errors import NewswatchError
 from newswatch.feed import parse_feed
@@ -31,11 +33,24 @@ from newswatch.schedule import (
 from newswatch.sources import Source, add_source, load_sources
 from newswatch.state import State, read_state, write_state
 from newswatch.store import FileStore
+from newswatch.summarize import summarize_article
 from newswatch.topics import Topic, add_topic, load_topics
 
 __all__ = ["main"]
 
 _DIGEST_TO_ENV = "NEWSWATCH_DIGEST_TO"
+_LLM_PROVIDER_ENV = "NEWSWATCH_LLM_PROVIDER"
+_LLM_MODEL_ENV = "NEWSWATCH_LLM_MODEL"
+
+
+def _llm_choice(args: argparse.Namespace) -> tuple[str, str | None]:
+    """The LLM provider and model for this run: the ``--provider`` / ``--model`` flag
+    wins, then the ``NEWSWATCH_LLM_PROVIDER`` / ``NEWSWATCH_LLM_MODEL`` setting, then the
+    default provider and its default model. Same flag-over-setting precedence as ``--to``.
+    """
+    provider = args.provider or config.setting(_LLM_PROVIDER_ENV) or DEFAULT_PROVIDER
+    model = args.model or config.setting(_LLM_MODEL_ENV)
+    return provider, model
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -119,8 +134,14 @@ def _run_poll(args: argparse.Namespace) -> int:
     gate = default_gate()
     state = read_state()
     store = None if args.no_store else FileStore()
-    report = poll_sources(sources, topics, gate=gate, state=state, store=store)
-    heal_notes = _heal_empty_sources(sources, gate, state) if not args.no_heal else ()
+    provider, model = _llm_choice(args)
+    summarize = functools.partial(summarize_article, provider=provider, model=model)
+    report = poll_sources(sources, topics, gate=gate, state=state, store=store,
+                          summarize=summarize)
+    heal_notes = (
+        _heal_empty_sources(sources, gate, state, provider=provider, model=model)
+        if not args.no_heal else ()
+    )
     write_state(state)
     for name, reason in report.skipped:
         print(f"newswatch: skipping {name}: {reason}", file=sys.stderr)
@@ -156,10 +177,12 @@ def _run_articles(args: argparse.Namespace) -> int:
 
 def _run_heal(args: argparse.Namespace) -> int:
     gate = default_gate()
+    provider, model = _llm_choice(args)
     for source in load_sources():
         if source.kind != "crawl":
             continue
-        result = heal_source(source, gate=gate, apply=not args.dry_run)
+        result = heal_source(source, gate=gate, apply=not args.dry_run,
+                             provider=provider, model=model)
         if result is not None:
             print(result.note)
     return 0
@@ -178,7 +201,8 @@ def _run_schedule(args: argparse.Namespace) -> int:
 
 
 def _heal_empty_sources(
-    sources: tuple[Source, ...], gate: RobotsGate, state: State,
+    sources: tuple[Source, ...], gate: RobotsGate, state: State, *,
+    provider: str, model: str | None,
 ) -> tuple[str, ...]:
     """Heal each crawl source that has hit the empty-poll threshold; return the notes.
     A heal failure for one source is reported but does not abort the poll."""
@@ -187,7 +211,7 @@ def _heal_empty_sources(
         if not needs_heal(source, state):
             continue
         try:
-            result = heal_source(source, gate=gate, apply=True)
+            result = heal_source(source, gate=gate, apply=True, provider=provider, model=model)
         except NewswatchError as err:
             notes.append(f"heal of {source.name!r} failed: {err}")
             continue
@@ -256,6 +280,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     heal = sub.add_parser("heal", help="check and repair crawl selectors")
     heal.add_argument("--dry-run", action="store_true", dest="dry_run")
+    _add_llm_flags(heal)
     heal.set_defaults(run=_run_heal)
 
     schedule = sub.add_parser("schedule", help="register the recurring poll with cron")
@@ -274,6 +299,13 @@ def _add_poll_flags(parser: argparse.ArgumentParser) -> None:
                         help="do not archive collected articles")
     parser.add_argument("--no-heal", action="store_true", dest="no_heal",
                         help="do not run selector healing this poll")
+    _add_llm_flags(parser)
+
+
+def _add_llm_flags(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--provider", default=None,
+                        help="LLM provider for summaries and healing (default gemini)")
+    parser.add_argument("--model", default=None, help="LLM model for the chosen provider")
 
 
 def _interval(text: str) -> int:

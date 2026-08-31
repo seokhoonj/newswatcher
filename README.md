@@ -84,6 +84,33 @@ take precedence over corresponding settings there. For example,
 the XDG data and state directories; `NEWSWATCH_DATA_DIR` and
 `NEWSWATCH_STATE_DIR` can override them.
 
+## Provider keys and model
+
+An LLM provider key is a secret, so it lives apart from the settings, in
+`credentials.json` under the same config directory — a flat JSON map keyed by the
+provider's standard environment-variable name:
+
+```json
+{
+  "GEMINI_API_KEY": "...",
+  "OPENAI_API_KEY": "...",
+  "CLAUDE_API_KEY": "..."
+}
+```
+
+Each key is also read from that same environment variable, which takes precedence,
+so a one-off run can supply a key without editing the file.
+
+newswatch summarizes with Gemini's free tier by default. Choose another provider,
+and optionally a specific model, with `--provider` / `--model`, or persistently
+with the `NEWSWATCH_LLM_PROVIDER` / `NEWSWATCH_LLM_MODEL` settings (`llm_provider`
+and `llm_model` in `config.toml`):
+
+```sh
+newswatch poll --provider claude --model claude-sonnet-5
+export NEWSWATCH_LLM_PROVIDER=openai
+```
+
 ## Responsible collection
 
 Every feed, listing-page, and article request is checked against the site's
@@ -110,5 +137,6 @@ newswatch schedule remove
 ```
 
 Scheduling requires the `crontab` command. The scheduled process uses the same
-configuration as an interactive poll, so make sure its environment provides the
-LLM key and any settings not stored in `config.toml`.
+configuration as an interactive poll, so make sure the LLM key is reachable (from
+`credentials.json` or its environment variable) along with any settings not stored
+in `config.toml`.

@@ -39,3 +39,48 @@ def test_unknown_command_exits_nonzero(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     code = cli.main(["frobnicate"])
     assert code != 0
+
+
+def _capture_summarizer(monkeypatch):
+    """Stub poll_sources to record the summarizer it is handed and report nothing."""
+    from newswatch.poll import PollReport
+    captured = {}
+
+    def fake_poll_sources(*args, **kwargs):
+        captured["summarize"] = kwargs["summarize"]
+        return PollReport((), (), ())
+
+    monkeypatch.setattr(cli, "poll_sources", fake_poll_sources)
+    return captured
+
+
+def test_poll_provider_flag_binds_summarizer(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
+    captured = _capture_summarizer(monkeypatch)
+    code = cli.main(["poll", "--no-mail", "--no-heal", "--no-store",
+                     "--provider", "openai", "--model", "gpt-x"])
+    assert code == 0
+    assert captured["summarize"].keywords["provider"] == "openai"
+    assert captured["summarize"].keywords["model"] == "gpt-x"
+
+
+def test_poll_provider_from_setting(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCH_LLM_PROVIDER", "claude")
+    captured = _capture_summarizer(monkeypatch)
+    code = cli.main(["poll", "--no-mail", "--no-heal", "--no-store"])
+    assert code == 0
+    assert captured["summarize"].keywords["provider"] == "claude"
+
+
+def test_poll_provider_defaults_to_gemini(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("NEWSWATCH_LLM_MODEL", raising=False)
+    captured = _capture_summarizer(monkeypatch)
+    code = cli.main(["poll", "--no-mail", "--no-heal", "--no-store"])
+    assert code == 0
+    from newswatch._llm import DEFAULT_PROVIDER
+    assert captured["summarize"].keywords["provider"] == DEFAULT_PROVIDER
+    assert captured["summarize"].keywords["model"] is None

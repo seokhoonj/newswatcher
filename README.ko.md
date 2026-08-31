@@ -82,6 +82,33 @@ crawl 소스에는 `item`, `title`, `link` selector (HTML에서 원하는 요소
 기사 archive (지속적으로 보관하는 기록)와 실행 상태는 XDG data/state 디렉터리를
 사용하며, `NEWSWATCH_DATA_DIR`와 `NEWSWATCH_STATE_DIR`로 위치를 바꿀 수 있습니다.
 
+## provider 키와 모델
+
+LLM provider 키는 비밀이므로 설정과 분리되어, 같은 설정 디렉터리의
+`credentials.json`에 저장합니다. provider의 표준 환경 변수 이름을 키로 쓰는 평범한
+JSON 맵입니다.
+
+```json
+{
+  "GEMINI_API_KEY": "...",
+  "OPENAI_API_KEY": "...",
+  "CLAUDE_API_KEY": "..."
+}
+```
+
+각 키는 같은 이름의 환경 변수에서도 읽으며 환경 변수가 우선하므로, 파일을 고치지
+않고도 일회성으로 키를 넣을 수 있습니다.
+
+newswatch는 기본적으로 Gemini 무료 티어로 요약합니다. 다른 provider(그리고 원하면
+특정 모델)는 `--provider` / `--model`로 고르거나, `NEWSWATCH_LLM_PROVIDER` /
+`NEWSWATCH_LLM_MODEL` 설정(`config.toml`의 `llm_provider`, `llm_model`)으로
+지속 지정합니다.
+
+```sh
+newswatch poll --provider claude --model claude-sonnet-5
+export NEWSWATCH_LLM_PROVIDER=openai
+```
+
 ## 책임 있는 수집
 
 모든 피드, 목록 페이지, 기사 요청은 전송 전에 사이트의 robots 정책을 확인하며
@@ -109,5 +136,5 @@ newswatch schedule remove
 ```
 
 스케줄링에는 `crontab` 명령이 필요합니다. 예약 실행도 대화형 poll과 같은 설정을
-사용하므로, LLM 키와 `config.toml`에 저장하지 않은 설정이 예약 실행 환경에 제공되는지
-확인해야 합니다.
+사용하므로, LLM 키가 (`credentials.json` 또는 환경 변수로) 닿는지와 `config.toml`에
+저장하지 않은 설정이 예약 실행 환경에 제공되는지 확인해야 합니다.
