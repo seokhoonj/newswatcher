@@ -6,6 +6,8 @@ the source's ``body_selector`` when it defines one, else the generic extractor
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import trafilatura
 from bs4 import BeautifulSoup
 
@@ -14,11 +16,14 @@ from newswatch.http import get
 from newswatch.robots import RobotsGate
 from newswatch.sources import Source
 
+if TYPE_CHECKING:
+    import requests
+
 __all__ = ["extract_body", "fetch_body"]
 
 
 def fetch_body(item: FeedItem, source: Source, gate: RobotsGate, *,
-               session: object | None = None) -> str:
+               session: requests.Session | None = None) -> str:
     """Fetch ``item``'s article page (robots-gated) and extract its body text, or ""
     when nothing could be extracted.
 
@@ -26,10 +31,7 @@ def fetch_body(item: FeedItem, source: Source, gate: RobotsGate, *,
         FetchError: robots disallows the article URL or the fetch failed (propagated
             from ``http.get``).
     """
-    import requests
-
-    html = get(item.link, gate, session=session if isinstance(session, requests.Session) else None)
-    return extract_body(html, source)
+    return extract_body(get(item.link, gate, session=session), source)
 
 
 def extract_body(html: str, source: Source) -> str:

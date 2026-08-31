@@ -9,6 +9,7 @@ import calendar
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import feedparser
 from feedparser.datetimes import _parse_date
@@ -16,6 +17,9 @@ from feedparser.datetimes import _parse_date
 from newswatch.http import get
 from newswatch.robots import RobotsGate
 from newswatch.sources import Source
+
+if TYPE_CHECKING:
+    import requests
 
 __all__ = ["FeedItem", "parse_feed", "fetch_feed", "normalize_date"]
 
@@ -37,18 +41,15 @@ class FeedItem:
     topics:      tuple[str, ...] = field(default=(), kw_only=True)
 
 
-def fetch_feed(source: Source, gate: RobotsGate, *, session: object | None = None
-               ) -> tuple[FeedItem, ...]:
+def fetch_feed(source: Source, gate: RobotsGate, *,
+               session: requests.Session | None = None) -> tuple[FeedItem, ...]:
     """Fetch and parse ``source``'s RSS feed into items.
 
     Raises:
         FetchError: robots disallows the feed URL or the fetch failed (propagated
             from ``http.get``).
     """
-    import requests
-
-    text = get(source.url, gate, session=session if isinstance(session, requests.Session) else None)
-    return parse_feed(text, source.name)
+    return parse_feed(get(source.url, gate, session=session), source.name)
 
 
 def parse_feed(text: str, source_name: str) -> tuple[FeedItem, ...]:

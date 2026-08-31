@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from newswatch.article import fetch_body
 from newswatch.crawl import crawl_items
@@ -21,6 +22,9 @@ from newswatch.state import State
 from newswatch.store import Article, FileStore
 from newswatch.summarize import Summary, summarize_article
 from newswatch.topics import Topic
+
+if TYPE_CHECKING:
+    import requests
 
 __all__ = ["PollReport", "poll_sources"]
 
@@ -42,7 +46,7 @@ class PollReport:
 def poll_sources(
     sources: tuple[Source, ...], topics: tuple[Topic, ...], *,
     gate: RobotsGate, state: State, store: FileStore | None,
-    session: object | None = None, summarize: Summarizer = summarize_article,
+    session: requests.Session | None = None, summarize: Summarizer = summarize_article,
 ) -> PollReport:
     """Run the pipeline once over ``sources``. Persists each collected article to
     ``store`` (when given) and advances ``state`` in place; the caller writes state and
@@ -72,7 +76,7 @@ def poll_sources(
 def _process(
     source: Source, items: tuple[FeedItem, ...], topics: tuple[Topic, ...],
     gate: RobotsGate, state: State, store: FileStore | None,
-    session: object | None, summarize: Summarizer, skipped: list[tuple[str, str]],
+    session: requests.Session | None, summarize: Summarizer, skipped: list[tuple[str, str]],
 ) -> Iterator[Article]:
     for item in items:
         if not state.is_new(source.name, item):
@@ -101,14 +105,14 @@ def _process(
         yield article
 
 
-def _collect(source: Source, gate: RobotsGate, session: object | None) -> tuple[FeedItem, ...]:
+def _collect(source: Source, gate: RobotsGate, session: requests.Session | None) -> tuple[FeedItem, ...]:
     """Collect a source's current items by its kind. Seam for tests to stub the network."""
     if source.kind == "crawl":
         return crawl_items(source, gate, session=session)
     return fetch_feed(source, gate, session=session)
 
 
-def _fetch_body(item: FeedItem, source: Source, gate: RobotsGate, session: object | None) -> str:
+def _fetch_body(item: FeedItem, source: Source, gate: RobotsGate, session: requests.Session | None) -> str:
     """Fetch an article body, degrading to "" on any fetch failure -- a body problem
     must not drop the article (the summary falls back to the feed text). Seam for tests."""
     try:

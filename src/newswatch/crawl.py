@@ -8,6 +8,7 @@ healer (see ``heal``) repairs it."""
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -17,21 +18,21 @@ from newswatch.http import get
 from newswatch.robots import RobotsGate
 from newswatch.sources import Source
 
+if TYPE_CHECKING:
+    import requests
+
 __all__ = ["extract_items", "crawl_items", "parse_selector"]
 
 
-def crawl_items(source: Source, gate: RobotsGate, *, session: object | None = None
-                ) -> tuple[FeedItem, ...]:
+def crawl_items(source: Source, gate: RobotsGate, *,
+                session: requests.Session | None = None) -> tuple[FeedItem, ...]:
     """Fetch ``source``'s listing page and extract its article items.
 
     Raises:
         FetchError: robots disallows the listing URL or the fetch failed (propagated
             from ``http.get``).
     """
-    import requests
-
-    html = get(source.url, gate, session=session if isinstance(session, requests.Session) else None)
-    return extract_items(html, source)
+    return extract_items(get(source.url, gate, session=session), source)
 
 
 def extract_items(html: str, source: Source) -> tuple[FeedItem, ...]:
