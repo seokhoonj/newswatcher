@@ -20,6 +20,7 @@ from thinchat.errors import ThinchatError
 from newswatch._llm import DEFAULT_PROVIDER, make_llm_client, scrub_secrets
 from newswatch.crawl import extract_items
 from newswatch.errors import HealError, NewswatchError
+from newswatch.http import get
 from newswatch.robots import RobotsGate
 from newswatch.sources import Source, update_selectors
 from newswatch.state import State
@@ -175,8 +176,6 @@ def _truncate(html: str, limit: int = 12000) -> str:
 def _fetch_listing(source: Source, gate: RobotsGate | None, session: requests.Session | None) -> str:
     """Fetch the listing page (robots-gated). Seam for tests, which stub it and so may
     pass gate=None; the live path always has a gate."""
-    from newswatch.http import get
-
     if gate is None:
         raise HealError(f"cannot heal {source.name!r}: a robots gate is required")
     return get(source.url, gate, session=session)

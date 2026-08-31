@@ -21,7 +21,7 @@ from newswatch.digest import send_digest
 from newswatch.errors import NewswatchError
 from newswatch.feed import parse_feed
 from newswatch.heal import heal_empty_sources, heal_source
-from newswatch.http import new_session
+from newswatch.http import get, new_session
 from newswatch.lock import single_instance
 from newswatch.poll import poll_sources
 from newswatch.robots import default_gate
@@ -126,7 +126,6 @@ def _run_sources(args: argparse.Namespace) -> int:
 
 
 def _run_recent(args: argparse.Namespace) -> int:
-    from newswatch.http import get
     gate = default_gate()
     items = parse_feed(get(args.url, gate), args.url)
     for item in items[: args.limit]:
