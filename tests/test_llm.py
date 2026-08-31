@@ -46,23 +46,28 @@ def test_make_llm_client_hides_an_explicitly_passed_key(monkeypatch, tmp_path):
 
 
 def test_scrub_exception_scrubs_the_whole_cause_chain(monkeypatch, tmp_path):
+    import traceback
+    secret = "SECRET-KEY-123"
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")
-    # A provider error (ThinchatError) whose own cause (a transport error) embeds the
-    # key in a URL -- the realistic Gemini shape.
+    monkeypatch.setenv("GEMINI_API_KEY", secret)
+    # Build the key-bearing message from a variable so the *source line* the traceback
+    # echoes does not itself contain the literal (that would be a test artifact, not a
+    # scrub failure). A 3-deep chain with the key ONLY in the deepest link, reached via
+    # both an implicit context (__context__) and an explicit cause (__cause__).
+    deepest = f"GET https://api?key={secret} refused"
     try:
         try:
-            raise ValueError("GET https://api?key=SECRET-KEY-123 failed")
-        except ValueError as transport:
-            raise ThinchatError("provider call failed") from transport
+            try:
+                raise OSError(deepest)
+            except OSError:
+                raise ValueError("transport failed")  # noqa: B904  # implicit __context__ is the point
+        except ValueError as mid:
+            raise ThinchatError("provider call failed") from mid   # explicit __cause__
     except ThinchatError as err:
         scrubbed = _llm.scrub_exception(err)
-    chain = []
-    node: BaseException | None = scrubbed
-    while node is not None:
-        chain.append(str(node))
-        node = node.__cause__ or node.__context__
-    assert not any("SECRET-KEY-123" in link for link in chain)
+    # Assert against the actual rendered traceback, the real leak surface, not a re-walk.
+    formatted = "".join(traceback.format_exception(scrubbed))
+    assert secret not in formatted
 
 
 def test_make_llm_client_uses_credentials_file(monkeypatch, tmp_path):

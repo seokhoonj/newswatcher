@@ -86,6 +86,19 @@ def test_get_does_not_close_an_injected_session():
     assert injected.closed is False   # the caller owns an injected session
 
 
+def test_get_closes_a_created_session_even_on_request_failure(monkeypatch):
+    class _FailingSession(_RecordingSession):
+        def get(self, url, timeout=None):
+            return _Resp(500, "")   # raise_for_status will raise -> FetchError
+
+    created = _FailingSession()
+    monkeypatch.setattr(http, "new_session", lambda: created)
+    gate = RobotsGate("ua", lambda url: None)
+    with pytest.raises(FetchError):
+        http.get("https://e.com/x", gate)   # no session -> created, and closed on the error path
+    assert created.closed is True
+
+
 # --- fetch_robots: RFC 9309 fail-open on 4xx, fail-closed on 5xx / unreachable ---
 
 def test_fetch_robots_4xx_allows(monkeypatch):
