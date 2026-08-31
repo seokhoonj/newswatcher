@@ -68,6 +68,19 @@ def test_install_rejects_non_representable_interval(monkeypatch):
         install_poll(1500)   # 25h -- not a simple cron step
 
 
+def test_install_twelve_hour_divisor(monkeypatch):
+    _fake_crontab(monkeypatch)
+    assert install_poll(480).startswith("0 */8 * * * ")   # 8h divides 24
+
+
+def test_install_rejects_zero_without_crashing(monkeypatch):
+    # install_poll is public; a 0 must raise the domain error, not ZeroDivisionError
+    # from the 60 % every_minutes divisor check.
+    _fake_crontab(monkeypatch)
+    with pytest.raises(ScheduleError):
+        install_poll(0)
+
+
 def test_install_rejects_non_divisor_intervals(monkeypatch):
     # A cron */step restarts at the field's zero each hour/day, so a non-divisor
     # mis-fires: */45 fires :00,:45 (45-then-15); 0 */5 fires h0,5,10,15,20 then a 4h gap.

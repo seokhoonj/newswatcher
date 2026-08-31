@@ -76,6 +76,8 @@ def _cron_time_spec(every_minutes: int) -> str:
     Raises:
         ScheduleError: the interval does not map to a regular cron schedule.
     """
+    if every_minutes < 1:
+        raise ScheduleError(f"interval must be at least 1 minute, got {every_minutes}")
     if every_minutes < 60:
         if 60 % every_minutes:
             raise _irregular(every_minutes)
