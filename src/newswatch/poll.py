@@ -30,8 +30,9 @@ Summarizer = Callable[..., Summary]
 @dataclass(frozen=True, slots=True)
 class PollReport:
     """What one poll produced: the ``collected`` new articles (in collection order),
-    the ``empty_crawl_sources`` whose selector matched nothing, and ``skipped`` sources
-    as ``(name, reason)`` pairs."""
+    the ``empty_crawl_sources`` whose selector matched nothing, and ``skipped`` as
+    ``(name, reason)`` pairs -- a source whose fetch failed (name = source), or a single
+    article whose summary or archive failed (name = article link)."""
 
     collected:           tuple[Article, ...]
     empty_crawl_sources: tuple[str, ...]
@@ -62,7 +63,8 @@ def poll_sources(
             continue
         if source.kind == "crawl":
             state.clear_empty(source.name)
-        for article in _process(source, items, topics, gate, state, store, session, summarize):
+        for article in _process(source, items, topics, gate, state, store,
+                                session, summarize, skipped):
             collected.append(article)
     return PollReport(tuple(collected), tuple(empty), tuple(skipped))
 
@@ -70,24 +72,32 @@ def poll_sources(
 def _process(
     source: Source, items: tuple[FeedItem, ...], topics: tuple[Topic, ...],
     gate: RobotsGate, state: State, store: FileStore | None,
-    session: object | None, summarize: Summarizer,
+    session: object | None, summarize: Summarizer, skipped: list[tuple[str, str]],
 ) -> Iterator[Article]:
     for item in items:
         if not state.is_new(source.name, item):
             continue
         tagged = assign_topics(item, source, topics)
-        state.mark_seen(source.name, item)   # advance past it whether or not it matched
         if tagged is None:
+            state.mark_seen(source.name, item)   # advance past a non-match; never revisit
             continue
         body = _fetch_body(tagged, source, gate, session)
-        summary = summarize(tagged, body)
-        article = Article(
-            guid=tagged.guid, title=tagged.title, link=tagged.link,
-            source_name=source.name, published=tagged.published, topics=tagged.topics,
-            summary=summary.text, summary_model=summary.model,
-        )
-        if store is not None:
-            store.save(article)
+        try:
+            summary = summarize(tagged, body)
+            article = Article(
+                guid=tagged.guid, title=tagged.title, link=tagged.link,
+                source_name=source.name, published=tagged.published, topics=tagged.topics,
+                summary=summary.text, summary_model=summary.model,
+            )
+            if store is not None:
+                store.save(article)
+        except NewswatchError as err:
+            # A summary or archive failure drops this one article, not the poll (the
+            # module invariant: one bad source must not stop the rest). Leave it
+            # unmarked so a transient outage retries it on the next poll.
+            skipped.append((tagged.link, str(err)))
+            continue
+        state.mark_seen(source.name, item)
         yield article
 
 

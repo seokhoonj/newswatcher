@@ -1,3 +1,4 @@
+from newswatch.errors import CorpusError, LLMError
 from newswatch.feed import FeedItem
 from newswatch.poll import poll_sources
 from newswatch.robots import RobotsGate
@@ -55,6 +56,52 @@ def test_second_poll_skips_seen(tmp_path, monkeypatch):
     r2 = poll_sources((src,), (Topic("insurance"),), gate=_gate, state=state,
                       store=store, summarize=_fake_summary)
     assert len(r1.collected) == 1 and len(r2.collected) == 0
+
+
+def test_poll_degrades_on_summary_error(tmp_path, monkeypatch):
+    import newswatch.poll as poll
+    src = Source("지", kind="rss", url="u", topics=("t",), keep_all=True)
+    items = (FeedItem(title="a", link="https://e.com/1", guid="g1",
+                      published="2026-08-15T00:00:00Z", source_name="지"),
+             FeedItem(title="b", link="https://e.com/2", guid="g2",
+                      published="2026-08-15T00:00:00Z", source_name="지"))
+    monkeypatch.setattr(poll, "_collect", lambda s, g, sess: items)
+    monkeypatch.setattr(poll, "_fetch_body", lambda item, s, g, sess: "본문")
+
+    def summarize(item, body, **k):
+        if item.guid == "g1":
+            raise LLMError("boom")
+        return Summary(title=item.title, link=item.link, text="ok", model="m")
+
+    state = State()
+    report = poll_sources((src,), (Topic("t"),), gate=_gate, state=state,
+                          store=FileStore(tmp_path), summarize=summarize)
+    # one bad article does not abort the poll; the good one is still collected
+    assert [a.guid for a in report.collected] == ["g2"]
+    assert any("e.com/1" in name for name, _ in report.skipped)
+    # the failed article is left unmarked, so a transient outage retries it next poll
+    assert state.is_new("지", items[0]) is True
+    assert state.is_new("지", items[1]) is False
+
+
+def test_poll_degrades_on_store_error(tmp_path, monkeypatch):
+    import newswatch.poll as poll
+    src = Source("지", kind="rss", url="u", topics=("t",), keep_all=True)
+    items = (FeedItem(title="a", link="https://e.com/1", guid="g1",
+                      published="2026-08-15T00:00:00Z", source_name="지"),)
+    monkeypatch.setattr(poll, "_collect", lambda s, g, sess: items)
+    monkeypatch.setattr(poll, "_fetch_body", lambda item, s, g, sess: "본문")
+
+    class BadStore(FileStore):
+        def save(self, article):
+            raise CorpusError("disk full")
+
+    state = State()
+    report = poll_sources((src,), (Topic("t"),), gate=_gate, state=state,
+                          store=BadStore(tmp_path), summarize=_fake_summary)
+    assert report.collected == ()
+    assert any("e.com/1" in name for name, _ in report.skipped)
+    assert state.is_new("지", items[0]) is True   # unmarked -> retry next poll
 
 
 def test_empty_crawl_source_is_reported(tmp_path, monkeypatch):
