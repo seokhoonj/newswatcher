@@ -175,6 +175,7 @@ def _poll_once(args: argparse.Namespace) -> int:
     state = read_state()
     store = None if args.no_store else FileStore()
     provider, model = _resolve_llm_choice(args)
+    threshold = _resolve_dedup_threshold()   # validate up-front, before the poll spends the LLM
     summarize = functools.partial(summarize_article, provider=provider, model=model)
     with new_session() as session:   # one pooled connection for every fetch this poll
         report = poll_sources(sources, topics, gate=gate, state=state, store=store,
@@ -190,7 +191,7 @@ def _poll_once(args: argparse.Namespace) -> int:
         email_to = args.to or config.setting(_DIGEST_TO_ENV)
         push_to = args.push or config.setting(_DIGEST_PUSH_ENV)
         if email_to or push_to:
-            stories = group_stories(report.collected, threshold=_resolve_dedup_threshold())
+            stories = group_stories(report.collected, threshold=threshold)
             for failure in send_digest(stories, email_to=email_to,
                                        push_to=push_to, heal_notes=heal_notes):
                 # A partial failure (one channel down, another delivered): report it, but do
@@ -210,14 +211,21 @@ def _poll_once(args: argparse.Namespace) -> int:
 
 def _run_watch(args: argparse.Namespace) -> int:
     every = args.every if args.every is not None else DEFAULT_INTERVAL_MINUTES
+    # Screen the run's static config once, before the loop. A bad provider or dedup
+    # threshold is permanent within the process (settings load once at startup; the
+    # environment cannot change mid-run), so letting it raise here ends the watch with a
+    # clear error instead of looping forever on the same failure while never delivering.
+    _resolve_llm_choice(args)
+    _resolve_dedup_threshold()
     print(f"watching every {every} min; Ctrl-C to stop", file=sys.stderr)
     next_tick = time.monotonic()
     while True:
         try:
             _run_poll(args)
         except NewswatchError as err:
-            # One transient failure (a mail/LLM/config error) must not end the watch --
-            # the state was not written, so the next tick re-collects and re-sends.
+            # One transient failure (a fetch/LLM/mail blip) must not end the watch -- the
+            # state was not written, so the next tick re-collects and re-sends. Permanent
+            # config errors were screened out above the loop.
             print(f"newswatch: {err}", file=sys.stderr)
         next_tick = max(next_tick + every * 60, time.monotonic())
         time.sleep(max(0.0, next_tick - time.monotonic()))   # a poll that overran sleeps 0

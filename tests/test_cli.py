@@ -10,6 +10,8 @@ def test_watch_clamps_negative_sleep(monkeypatch):
     # the naive (next_tick - now) is negative. time.sleep rejects a negative value with
     # ValueError -- which, not being a NewswatchError, would crash the watcher.
     monkeypatch.setattr(cli, "_run_poll", lambda a: 0)
+    monkeypatch.setattr(cli, "_resolve_llm_choice", lambda a: ("gemini", None))
+    monkeypatch.setattr(cli, "_resolve_dedup_threshold", lambda: 0.5)
     times = iter([0.0, 5000.0, 5000.5])   # init, post-poll (overran), pre-sleep
     monkeypatch.setattr("time.monotonic", lambda: next(times))
     slept = []
@@ -44,6 +46,8 @@ def test_watch_survives_a_transient_poll_error(monkeypatch):
         raise _Stop   # break the loop on the 2nd tick
 
     monkeypatch.setattr(cli, "_run_poll", fake_poll)
+    monkeypatch.setattr(cli, "_resolve_llm_choice", lambda a: ("gemini", None))
+    monkeypatch.setattr(cli, "_resolve_dedup_threshold", lambda: 0.5)
     monkeypatch.setattr("time.monotonic", lambda: 0.0)
     monkeypatch.setattr("time.sleep", lambda s: None)
     with pytest.raises(_Stop):
@@ -217,6 +221,40 @@ def test_poll_rejects_a_nonnumeric_dedup_threshold(monkeypatch, tmp_path, capsys
     _poll_returning_one(monkeypatch)
     assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
     assert "NEWSWATCH_DEDUP_THRESHOLD" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("bad", ["-1", "2.0", "nan", "inf", "-inf"])
+def test_poll_rejects_an_out_of_range_or_nonfinite_dedup_threshold(
+    monkeypatch, tmp_path, capsys, bad
+):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", bad)
+    _poll_returning_one(monkeypatch)
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
+    assert "NEWSWATCH_DEDUP_THRESHOLD" in capsys.readouterr().err
+
+
+def test_poll_validates_the_dedup_threshold_before_spending_the_llm(monkeypatch, tmp_path):
+    # A malformed threshold must fail before poll_sources runs (which pays the LLM to
+    # summarize), not after -- else every watch tick re-spends before re-failing.
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "nonsense")
+    spent = []
+    monkeypatch.setattr(cli, "poll_sources", lambda *a, **k: spent.append(1))
+    monkeypatch.setattr(cli, "read_state", lambda *a, **k: object())
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
+    assert spent == []   # the paid poll was never reached
+
+
+def test_watch_ends_instead_of_looping_on_a_permanent_config_error(monkeypatch, tmp_path):
+    # A permanent bad threshold must end the watch (exit 1), not loop forever re-failing
+    # while never delivering: the pre-flight resolution raises before the loop body runs.
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "nonsense")
+    ran = []
+    monkeypatch.setattr(cli, "_run_poll", lambda a: ran.append(1))
+    assert cli.main(["watch"]) == 1
+    assert ran == []   # the loop body never ran
 
 
 def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
