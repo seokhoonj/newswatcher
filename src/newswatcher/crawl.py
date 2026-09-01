@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
+from soupsieve import SelectorSyntaxError
 
 from newswatcher.errors import SourceError
 from newswatcher.feed import FeedItem, normalize_date
@@ -48,12 +49,12 @@ def extract_items(html: str, source: Source) -> tuple[FeedItem, ...]:
             f"crawl source {source.name!r} is missing its item/title/link selectors")
     soup = BeautifulSoup(html, "lxml")
     items = []
-    for row in soup.select(source.item):
-        link = _select_value(row, source.link, base=source.url)
+    for row in _select_all(soup, source.item, source.name):
+        link = _select_value(row, source.link, source.name, base=source.url)
         if not link:
             continue
-        title = _select_value(row, source.title) or ""
-        raw_date = _select_value(row, source.date) if source.date else ""
+        title = _select_value(row, source.title, source.name) or ""
+        raw_date = _select_value(row, source.date, source.name) if source.date else ""
         items.append(FeedItem(
             title=title,
             link=link,
@@ -75,12 +76,27 @@ def parse_selector(selector: str) -> tuple[str, str | None]:
     return css, attr
 
 
-def _select_value(row: Tag, selector: str, *, base: str | None = None) -> str:
+def _select_all(node: Tag | BeautifulSoup, selector: str, source_name: str) -> list[Tag]:
+    """``node.select(selector)``, converting a malformed-selector error into a domain
+    ``SourceError`` -- so one bad selector skips its source (the poll catches ``SourceError``
+    per source) instead of a raw ``SelectorSyntaxError`` aborting the whole pass."""
+    try:
+        return node.select(selector)
+    except SelectorSyntaxError as err:
+        raise SourceError(
+            f"source {source_name!r}: invalid CSS selector {selector!r}: {err}") from err
+
+
+def _select_value(row: Tag, selector: str, source_name: str, *, base: str | None = None) -> str:
     """The text (or attribute) of the first element under ``row`` matching ``selector``,
     "" when none matches. With ``base`` an attribute value is joined onto it (relative
     link -> absolute)."""
     css, attr = parse_selector(selector)
-    found = row.select_one(css)
+    try:
+        found = row.select_one(css)
+    except SelectorSyntaxError as err:
+        raise SourceError(
+            f"source {source_name!r}: invalid CSS selector {css!r}: {err}") from err
     if found is None:
         return ""
     if attr is not None:

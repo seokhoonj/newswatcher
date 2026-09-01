@@ -12,6 +12,23 @@ def test_extract_missing_selectors_raises_sourceerror():
     with pytest.raises(SourceError):
         extract_items("<html></html>", src)
 
+
+def test_malformed_item_selector_raises_sourceerror_not_soupsieve():
+    # A hand-typed bad selector must fail as the domain SourceError -- which the poll catches
+    # per source and skips -- not as a bare soupsieve SelectorSyntaxError that aborts the run.
+    src = Source("x", kind="crawl", url="https://e.com/list",
+                 item=">>bad", title="a", link="a@href")
+    with pytest.raises(SourceError):
+        extract_items("<html><a>x</a></html>", src)
+
+
+def test_malformed_row_selector_raises_sourceerror():
+    # The bad selector is on title/link (the per-row select), not item.
+    src = Source("x", kind="crawl", url="https://e.com/list",
+                 item="li", title=">>bad", link="a@href")
+    with pytest.raises(SourceError):
+        extract_items('<html><li><a href="/1">t</a></li></html>', src)
+
 HTML = """<html><body><ul class="list">
 <li class="row"><a class="tit" href="/a/1">보험료 인상</a><span class="date">2026-08-15</span></li>
 <li class="row"><a class="tit" href="https://e.com/a/2">손해율 급등</a><span class="date">2026-08-14</span></li>
