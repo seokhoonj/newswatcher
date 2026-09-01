@@ -65,13 +65,14 @@ def single_instance(name: str) -> Iterator[bool]:
     if fcntl is not None:
         with path.open("w") as handle:
             try:
-                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # fcntl is POSIX-only, so its symbols are invisible to mypy on Windows.
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)  # type: ignore[attr-defined]
             except OSError:
                 yield False   # another holder has it; do not block
                 return
             try:
                 yield True
             finally:
-                fcntl.flock(handle, fcntl.LOCK_UN)
+                fcntl.flock(handle, fcntl.LOCK_UN)  # type: ignore[attr-defined]
         return
     yield True   # no advisory file lock available on this platform

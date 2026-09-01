@@ -77,3 +77,10 @@ check_untyped_defs = true
 [[tool.mypy.overrides]]
 module = ["feedparser", "trafilatura", "bs4"]
 ignore_missing_imports = true
+
+# These two modules carry a POSIX branch and a Windows branch, and typeshed only reveals
+# the host's own (fcntl vs msvcrt; ctypes.windll). Both branches therefore need an ignore
+# and one of them is always unused, so type-checking on either OS means not warning here.
+[[tool.mypy.overrides]]
+module = ["newswatch.lock", "newswatch.schedule"]
+warn_unused_ignores = false
