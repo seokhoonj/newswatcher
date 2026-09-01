@@ -265,3 +265,57 @@ def test_heal_threads_provider_to_heal_source(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "default_gate", lambda: None)
     assert cli.main(["heal", "--provider", "openai", "--model", "gpt-x"]) == 0
     assert captured == {"provider": "openai", "model": "gpt-x"}
+
+
+# --- schedule: the subcommand had no test, so only the live round-trip ever checked it ---
+
+def _fake_cron(monkeypatch, initial=()):
+    """Pin the POSIX backend and give it an in-memory crontab, so these exercise the real
+    _run_schedule and the real install/remove/status rather than a stubbed CLI."""
+    from newswatch import schedule
+    store = {"lines": list(initial)}
+    monkeypatch.setattr(schedule, "_is_windows", lambda: False)
+    monkeypatch.setattr(schedule, "_read_crontab", lambda: list(store["lines"]))
+    monkeypatch.setattr(schedule, "_write_crontab",
+                        lambda lines: store.__setitem__("lines", list(lines)))
+    return store
+
+
+def test_schedule_install_uses_the_given_interval(monkeypatch, capsys):
+    _fake_cron(monkeypatch)
+    assert cli.main(["schedule", "install", "--every", "2h"]) == 0
+    assert "installed: 0 */2 * * * " in capsys.readouterr().out
+
+
+def test_schedule_install_defaults_the_interval(monkeypatch, capsys):
+    from newswatch.schedule import DEFAULT_INTERVAL_MINUTES
+    _fake_cron(monkeypatch)
+    assert cli.main(["schedule", "install"]) == 0
+    assert f"*/{DEFAULT_INTERVAL_MINUTES} * * * * " in capsys.readouterr().out
+
+
+def test_schedule_status_round_trips_install(monkeypatch, capsys):
+    _fake_cron(monkeypatch)
+    assert cli.main(["schedule", "status"]) == 0
+    assert capsys.readouterr().out.strip() == "not installed"
+    cli.main(["schedule", "install", "--every", "15"])
+    capsys.readouterr()
+    assert cli.main(["schedule", "status"]) == 0
+    assert capsys.readouterr().out.startswith("*/15 * * * * ")
+
+
+def test_schedule_remove_reports_both_outcomes(monkeypatch, capsys):
+    _fake_cron(monkeypatch)
+    assert cli.main(["schedule", "remove"]) == 0
+    assert "no poll job was installed" in capsys.readouterr().out
+    cli.main(["schedule", "install"])
+    capsys.readouterr()
+    assert cli.main(["schedule", "remove"]) == 0
+    assert "removed the poll job" in capsys.readouterr().out
+
+
+def test_schedule_install_rejects_a_bad_interval(monkeypatch, capsys):
+    # _interval raises inside argparse, and main turns argparse's SystemExit into a code.
+    _fake_cron(monkeypatch)
+    assert cli.main(["schedule", "install", "--every", "soon"]) == 2
+    assert "interval must be minutes" in capsys.readouterr().err
