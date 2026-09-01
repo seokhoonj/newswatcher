@@ -73,12 +73,13 @@ def state_path() -> Path:
 
 
 def read_state(path: Path | None = None) -> State:
-    """Return the persisted ``State``; an empty one when there is no file or it is
-    corrupt. A genuine I/O error is not swallowed (reading it as empty would let the
-    next write wipe real watermarks).
+    """Return the persisted ``State``; an empty one only when there is no file yet. A file
+    that exists but is unreadable or corrupt raises rather than reading as empty -- because
+    the poll writes the returned state back, so silently reading a corrupt file as empty
+    would wipe every source's real watermark (mass re-collect, re-summarize, re-send).
 
     Raises:
-        ConfigError: the state file exists but could not be read (an I/O error).
+        ConfigError: the state file exists but could not be read or parsed.
     """
     path = path or state_path()
     try:
@@ -89,8 +90,10 @@ def read_state(path: Path | None = None) -> State:
         raise ConfigError(f"could not read state file {path}: {err}") from err
     try:
         parsed = json.loads(text)
-    except json.JSONDecodeError:
-        return State()
+    except json.JSONDecodeError as err:
+        raise ConfigError(
+            f"state file {path} is corrupt ({err}); move or delete it to start fresh"
+        ) from err
     if not isinstance(parsed, dict):
         return State()
     return State(

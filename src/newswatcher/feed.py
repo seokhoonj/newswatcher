@@ -8,8 +8,8 @@ from __future__ import annotations
 import calendar
 import time
 from collections.abc import Mapping
-from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 __all__ = ["FeedItem", "parse_feed", "fetch_feed", "normalize_date"]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class FeedItem:
     """One article as collected from a source, before topic matching. ``guid`` is the
     item's stable id (its RSS guid, or its link when none), used to dedup against the
@@ -39,7 +39,7 @@ class FeedItem:
     summary:     str = ""
     published:   str = ""
     source_name: str = ""
-    topics:      tuple[str, ...] = field(default=(), kw_only=True)
+    topics:      tuple[str, ...] = ()
 
 
 def fetch_feed(source: Source, gate: RobotsGate, *,
@@ -83,6 +83,11 @@ _NUMERIC_FORMATS = (
     "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M", "%Y/%m/%d",
 )
 
+# These bare numeric stamps carry no zone; on the Korean sites that render them the wall
+# clock is KST, so they are read as KST (a fixed +9, no DST) and converted to UTC -- not
+# stamped as UTC, which would shift a crawl article 9 hours off its feed-sourced siblings.
+_KST = timezone(timedelta(hours=9))
+
 
 def normalize_date(text: str) -> str:
     """Parse a date string to the canonical ISO-8601 UTC form, or "" when it is empty or
@@ -116,7 +121,7 @@ def _parse_datetime(text: str) -> datetime | None:
         pass
     for fmt in _NUMERIC_FORMATS:
         try:
-            return datetime.strptime(text, fmt)
+            return datetime.strptime(text, fmt).replace(tzinfo=_KST)
         except ValueError:
             pass
     return None

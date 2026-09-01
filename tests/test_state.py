@@ -100,3 +100,15 @@ def test_roundtrip_persists(tmp_path):
     assert back.is_new("s", _item("g2")) is False
     assert back.is_new("s", _item("g3")) is True
     assert back.empty_polls_by_source["s"] == 1
+
+
+def test_read_state_raises_on_a_corrupt_file(tmp_path):
+    # A corrupt state file must raise, not read as empty -- else the poll's write-back would
+    # wipe every source's watermark (mass re-collect and re-send).
+    import pytest
+
+    from newswatcher.errors import ConfigError
+    p = tmp_path / "state.json"
+    p.write_text("{ this is not valid json", encoding="utf-8")
+    with pytest.raises(ConfigError):
+        read_state(p)

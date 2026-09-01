@@ -182,3 +182,27 @@ def test_fetch_robots_200_returns_rules(monkeypatch):
     gate = RobotsGate("ua", lambda url: text)
     assert gate.can_fetch("https://e.com/private/x") is False
     assert gate.can_fetch("https://e.com/public/x") is True
+
+
+# --- get() fixes requests' latin-1 default for a charset-less text response ---
+
+def test_charsetless_text_response_decoded_by_apparent_encoding():
+    class _R:
+        headers = {"Content-Type": "text/html"}
+        encoding = "ISO-8859-1"
+        apparent_encoding = "utf-8"
+
+    r = _R()
+    http._fix_charsetless_encoding(cast(requests.Response, r))
+    assert r.encoding == "utf-8"   # detected, not the latin-1 default
+
+
+def test_declared_charset_is_left_alone():
+    class _R:
+        headers = {"Content-Type": "text/html; charset=euc-kr"}
+        encoding = "euc-kr"
+        apparent_encoding = "utf-8"
+
+    r = _R()
+    http._fix_charsetless_encoding(cast(requests.Response, r))
+    assert r.encoding == "euc-kr"   # a declared charset is trusted

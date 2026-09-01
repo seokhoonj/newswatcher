@@ -53,7 +53,19 @@ def get(url: str, gate: RobotsGate, *, session: requests.Session | None = None,
             response = _fetch_gated(http, url, gate, timeout)
     except requests.RequestException as err:
         raise FetchError(f"could not fetch {url}: {err}") from err
+    _fix_charsetless_encoding(response)
     return response.text
+
+
+def _fix_charsetless_encoding(response: requests.Response) -> None:
+    """requests decodes a ``text/*`` body whose Content-Type carries no charset as
+    ISO-8859-1. Many older Korean news pages (EUC-KR or UTF-8) send no header charset, so
+    that default turns the listing/body into mojibake that then flows into the LLM summary
+    and the digest. When the header omits a charset, decode by the bytes' own detected
+    encoding instead; a declared charset is trusted and left alone."""
+    content_type = response.headers.get("Content-Type", "").lower()
+    if content_type.startswith("text/") and "charset=" not in content_type:
+        response.encoding = response.apparent_encoding
 
 
 def _fetch_gated(http: requests.Session, url: str, gate: RobotsGate,

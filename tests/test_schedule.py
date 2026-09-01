@@ -63,6 +63,14 @@ def test_install_daily(monkeypatch):
     assert install_poll(1440).startswith("0 0 */1 * * ")
 
 
+def test_cron_line_quotes_a_command_path_with_spaces(monkeypatch):
+    _fake_crontab(monkeypatch)
+    monkeypatch.setattr(schedule, "resolve_poll_command",
+                        lambda: ["/opt/py 3/bin/python", "-m", "newswatcher", "poll"])
+    line = install_poll(30)
+    assert "'/opt/py 3/bin/python'" in line   # quoted so the space cannot split the crontab line
+
+
 def test_install_rejects_non_representable_interval(monkeypatch):
     _fake_crontab(monkeypatch)
     with pytest.raises(ScheduleError):

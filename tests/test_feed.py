@@ -9,12 +9,13 @@ def test_normalize_date_iso_and_rfc822_to_utc():
     assert normalize_date("") == ""                                        # empty
 
 
-def test_normalize_date_dotted_and_slash_forms():
-    # The dotted/slash numeric stamps Korean news sites emit -- newswatcher's target locale.
-    assert normalize_date("2026.08.15") == "2026-08-15T00:00:00Z"
-    assert normalize_date("2026.08.15 09:00") == "2026-08-15T09:00:00Z"
-    assert normalize_date("2026/08/15 09:00:00") == "2026-08-15T09:00:00Z"
-    assert normalize_date("2026/08/15") == "2026-08-15T00:00:00Z"
+def test_normalize_date_dotted_and_slash_forms_are_read_as_kst():
+    # The dotted/slash numeric stamps Korean news sites emit carry no zone; they are read as
+    # KST (+9) and converted to UTC, so a crawl article lines up with its feed-sourced peers.
+    assert normalize_date("2026.08.15 09:00") == "2026-08-15T00:00:00Z"   # 09:00 KST = 00:00Z
+    assert normalize_date("2026/08/15 09:00:00") == "2026-08-15T00:00:00Z"
+    assert normalize_date("2026.08.15") == "2026-08-14T15:00:00Z"         # 00:00 KST = prev 15:00Z
+    assert normalize_date("2026/08/15") == "2026-08-14T15:00:00Z"
 
 RSS = """<?xml version="1.0"?>
 <rss version="2.0"><channel><title>보험신보 - 전체기사</title>

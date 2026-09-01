@@ -14,6 +14,7 @@ import ctypes
 import locale
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -74,7 +75,10 @@ def install_poll(every_minutes: int) -> str:
 
 
 def _cron_install(every_minutes: int) -> str:
-    line = f"{_cron_time_spec(every_minutes)} {' '.join(resolve_poll_command())} {_MARKER}"
+    # shlex-quote each argument so an interpreter path with a space (a project dir with a
+    # space, a macOS path) does not split into a broken crontab line that fails every tick.
+    command = " ".join(shlex.quote(part) for part in resolve_poll_command())
+    line = f"{_cron_time_spec(every_minutes)} {command} {_MARKER}"
     lines = [ln for ln in _read_crontab() if _MARKER not in ln]
     lines.append(line)
     _write_crontab(lines)
