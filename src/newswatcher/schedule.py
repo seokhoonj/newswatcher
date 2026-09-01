@@ -29,7 +29,7 @@ __all__ = [
 DEFAULT_INTERVAL_MINUTES = 30
 _MARKER = "# newswatcher-poll"      # POSIX crontab marker comment
 _TASK_NAME = "newswatcher-poll"     # Windows scheduled-task name (the schtasks marker)
-_SUBPROCESS_TIMEOUT_SECONDS = 20   # a hung crontab/schtasks must not hang the CLI
+_SUBPROCESS_TIMEOUT_SECONDS = 20    # a hung crontab/schtasks must not hang the CLI
 
 
 def _run_scheduler_command(

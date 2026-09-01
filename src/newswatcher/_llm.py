@@ -92,8 +92,8 @@ def scrub_exception(err: BaseException, *, extra_key: str | None = None) -> Base
             pass   # a subclass whose args read/set raises -- other links are still scrubbed
         # A transport error carries the fetched URL -- and thus a query-string key -- on the
         # exception and on its .request/.response; scrub those too, best-effort. Every access
-        # is wrapped: httpx (anthropic/openai backends) spells .request and .url as properties
-        # that *raise* RuntimeError when unset, not return None, and this scrubber runs on the
+        # is wrapped: httpx (anthropic/openai backends) spells .request as a property that
+        # *raises* RuntimeError when unset, not return None, and this scrubber runs on the
         # error path -- if it raised it would mask the very error it was cleaning.
         url_holders: list[Any] = [node]
         for attr in ("request", "response"):
