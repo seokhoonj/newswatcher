@@ -1,9 +1,11 @@
 # 해외 언론사 RSS 피드 목록 (영어권)
 
-영어권 주요 해외 언론사를 카테고리별로 정리한 표. `RSS` 열의 ✅ 는 **실제 fetch로
-검증된** 피드가 있다는 뜻이고, ❌ 는 검증 시점에 살아있는 공개 RSS를 확인하지 못했다는
-뜻이다. ✅ 의 URL은 그대로 newswatch `add-source --kind rss` 에 넣을 수 있다. 피드는
-영어이므로 토픽 키워드도 영어로 맞춘다.
+영어권 주요 해외 언론사를 카테고리별로 정리한 표(일반 매체 + 보험/금융 전문지).
+`RSS` 열의 ✅ 는 **실제 fetch로 검증된** 피드가 있다는 뜻이고, ❌ 는 검증 시점에 살아있는
+공개 RSS를 확인하지 못했다는 뜻, 🔒 는 **피드는 실존하나 Cloudflare가 자동 요청을 403으로
+막아** newswatch 기본 UA로는 받지 못한다는 뜻이다(브라우저로는 열린다). ✅ 의 URL은 그대로
+newswatch `add-source --kind rss` 에 넣을 수 있다. 피드는 영어이므로 토픽 키워드도 영어로
+맞춘다.
 
 - 검증 일자: 2026-09-01
 - 검증 방법: 각 매체의 공개 RSS 후보 경로를 직접 요청해 feedparser로 파싱, 항목(entry)이
@@ -68,6 +70,39 @@ newswatch `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드로 
 | MarketWatch | ✅ | http://feeds.marketwatch.com/marketwatch/topstories/ | 전체 | 10 | 무료 |
 | Fortune | ✅ | https://fortune.com/feed/ | 전체 | 10 | 유료 |
 
+## 보험 / 재보험 전문
+
+| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
+|------|:---:|----------|------|-------:|:----:|
+| Insurance Business | ✅ | https://www.insurancebusinessmag.com/us/rss/ | 전체 | 128 | 무료 |
+| Commercial Risk | ✅ | https://www.commercialriskonline.com/feed/ | 전체 | 100 | 무료 |
+| Insurance Journal | ✅ | https://www.insurancejournal.com/feed/ | 전체 | 30 | 무료 |
+| Business Insurance | ✅ | https://www.businessinsurance.com/rss | 전체 | 20 | 유료 |
+| Carrier Management | ✅ | https://www.carriermanagement.com/feed/ | 전체 | 10 | 무료 |
+| Coverager | ✅ | https://coverager.com/feed/ | 전체 | 10 | 무료 |
+| Digital Insurance | ✅ | https://www.dig-in.com/feed?rss=true | 전체 | 10 | 유료 |
+| Reinsurance News | 🔒 | https://www.reinsurancene.ws/feed/ | 전체 | — | 무료 |
+| Artemis (ILS·cat bond) | 🔒 | https://www.artemis.bm/feed/ | 전체 | — | 무료 |
+| PropertyCasualty360 | 🔒 | https://www.propertycasualty360.com/feed/ | 전체 | — | 유료 |
+| Intelligent Insurer / The Insurer / Insurance Insider | ❌ | — | — | — | — |
+
+Reinsurance News·Artemis·PropertyCasualty360 은 피드가 실존하지만 Cloudflare가 봇을 막는다
+(🔒). newswatch 기본 UA로는 403이 나므로 그대로는 폴이 안 되고, 브라우저에서는 열린다.
+계리(actuarial) 전문지(The Actuary, Actuarial Post, SOA)는 공개 RSS를 확인하지 못했다
+(대체로 회원 대상 발행이거나 봇 차단). 이런 곳은 `--kind crawl` 어댑터로 붙일 수 있다.
+
+## 금융 / 핀테크 전문
+
+| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
+|------|:---:|----------|------|-------:|:----:|
+| Finextra | ✅ | https://www.finextra.com/rss/headlines.aspx | 전체 | 57 | 무료 |
+| Seeking Alpha | ✅ | https://seekingalpha.com/feed.xml | 전체 | 30 | 유료 |
+| CoinDesk | ✅ | https://www.coindesk.com/arc/outboundfeeds/rss/ | 전체 | 25 | 무료 |
+| PYMNTS | ✅ | https://www.pymnts.com/feed/ | 전체 | 10 | 무료 |
+| American Banker | ✅ | https://www.americanbanker.com/feed?rss=true | 전체 | 10 | 유료 |
+| Investing.com | ✅ | https://www.investing.com/rss/news.rss | 전체 | 10 | 무료 |
+| Pensions & Investments / Institutional Investor / The Banker | ❌ | — | — | — | — |
+
 ## 기술 / IT
 
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
@@ -105,6 +140,8 @@ newswatch `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드로 
 ```sh
 newswatch add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
 newswatch add-source "BBC" https://feeds.bbci.co.uk/news/world/rss.xml --kind rss --topic markets
-newswatch add-source "Reuters via crawl" https://www.reuters.com/world/ --kind crawl \
-  --item article --title h3 --link a@href --topic markets
+
+newswatch add-topic insurance --include reinsurance underwriting "catastrophe bond" solvency
+newswatch add-source "Insurance Journal" https://www.insurancejournal.com/feed/ --kind rss --topic insurance
+newswatch add-source "Insurance Business" https://www.insurancebusinessmag.com/us/rss/ --kind rss --topic insurance
 ```
