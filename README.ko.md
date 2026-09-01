@@ -172,10 +172,16 @@ newswatch schedule status
 newswatch schedule remove
 ```
 
-스케줄링에는 `crontab` 명령이 필요합니다. 예약 실행도 대화형 poll과 같은 설정을
+스케줄링은 Linux·macOS에서 `crontab`, Windows에서 `schtasks`를 사용합니다.
+Windows에서는 하루 미만의 임의 간격이 동작하고(`--every 45`, `--every 5h`),
+Linux·macOS의 cron은 나눠떨어지는 간격(15/20/30분, 1/2/4/8/12시간, 하루)만 실행하며
+그 외 간격은 잘못 예약하지 않고 거부합니다. 예약 실행도 대화형 poll과 같은 설정을
 사용하므로, LLM 키가 (`credentials.json` 또는 환경 변수로) 닿는지와 `config.toml`에
 저장하지 않은 설정이 예약 실행 환경에 제공되는지 확인해야 합니다.
 
 poll은 단일 인스턴스 lock을 잡으므로 예약 poll과 수동 poll이 동시에 돌지 않습니다.
-나중에 시작한 쪽은 이미 poll이 실행 중이라고 알리고 종료합니다. (lock은 `flock`을
-쓰므로 Linux/macOS에서 동작하며, Windows에는 lock이 없습니다.)
+나중에 시작한 쪽은 이미 poll이 실행 중이라고 알리고 종료합니다. lock은 Linux·macOS에서
+`flock`, Windows에서 `msvcrt`를 씁니다.
+
+> 참고: Windows 스케줄러·lock 경로는 단위 테스트로 검증했으나 아직 실제 Windows
+> 머신에서 검증하지 않았습니다.

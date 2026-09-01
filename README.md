@@ -174,11 +174,17 @@ newswatch schedule status
 newswatch schedule remove
 ```
 
-Scheduling requires the `crontab` command. The scheduled process uses the same
+Scheduling uses `crontab` on Linux and macOS and `schtasks` on Windows. On Windows
+any interval under a day works (`--every 45`, `--every 5h`); on Linux and macOS cron
+only fires intervals that divide evenly (15/20/30 min, 1/2/4/8/12 h, or daily) and
+rejects the rest rather than mis-scheduling them. The scheduled process uses the same
 configuration as an interactive poll, so make sure the LLM key is reachable (from
 `credentials.json` or its environment variable) along with any settings not stored
 in `config.toml`.
 
 A poll takes a single-instance lock, so a scheduled poll and a manual one never run
-at once — whichever starts second logs that a poll is already running and exits. (The
-lock uses `flock`, so it is effective on Linux and macOS; on Windows there is none.)
+at once — whichever starts second logs that a poll is already running and exits. The
+lock uses `flock` on Linux and macOS and `msvcrt` on Windows.
+
+> Note: the Windows scheduler and lock paths are covered by unit tests but have not
+> yet been verified on a real Windows machine.
