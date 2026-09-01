@@ -152,6 +152,27 @@ def test_scrub_exception_redacts_a_url_attribute():
     assert "SECRET-KEY-123" not in scrubbed and "***" in scrubbed
 
 
+def test_scrub_exception_redacts_request_and_response_urls():
+    # A transport error carries the key not only on its own .url but on the .request and
+    # .response objects it attaches; the scrubber must reach both, since a traceback can
+    # render either.
+    secret = "SECRET-KEY-123"
+
+    class _Endpoint:
+        def __init__(self, url: str) -> None:
+            self.url = url
+
+    class _Transport(Exception):
+        pass
+
+    err = _Transport("call failed")
+    err.request = _Endpoint(f"https://api?key={secret}")   # type: ignore[attr-defined]
+    err.response = _Endpoint(f"https://api/retry?key={secret}")   # type: ignore[attr-defined]
+    _llm.scrub_exception(err, extra_key=secret)
+    assert secret not in err.request.url and "***" in err.request.url   # type: ignore[attr-defined]
+    assert secret not in err.response.url and "***" in err.response.url   # type: ignore[attr-defined]
+
+
 def test_scrub_exception_survives_a_raising_url_property():
     # httpx spells .request / .url as properties that raise (not return None) when unset;
     # a cause-chain link like that must not turn the scrubber -- which runs on the error

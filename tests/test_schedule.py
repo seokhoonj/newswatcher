@@ -342,3 +342,17 @@ def test_run_converts_timeout_to_scheduleerror(monkeypatch):
     monkeypatch.setattr("newswatcher.schedule.subprocess.run", hang)
     with pytest.raises(ScheduleError):
         schedule._run_scheduler_command(["crontab", "-l"])
+
+
+def test_run_passes_the_timeout_to_subprocess_run(monkeypatch):
+    # Pin the guard: a scheduler command that hangs must be bounded, so the wrapper must
+    # actually forward its timeout -- a fake that ignores kwargs would hide a dropped one.
+    captured: dict[str, object] = {}
+
+    def capture(*args, **kwargs):
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(args[0], 0, stdout="", stderr="")
+
+    monkeypatch.setattr("newswatcher.schedule.subprocess.run", capture)
+    schedule._run_scheduler_command(["crontab", "-l"], capture_output=True, text=True)
+    assert captured["timeout"] == schedule._SUBPROCESS_TIMEOUT_SECONDS

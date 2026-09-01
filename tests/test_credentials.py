@@ -98,6 +98,22 @@ def test_warns_once_when_credentials_file_is_group_readable(tmp_path, capsys):
     assert capsys.readouterr().err == ""
 
 
+def test_secret_warns_through_the_public_path_when_group_readable(monkeypatch, tmp_path, capsys):
+    # Prove the warning fires on the real lookup path, not just via the private helper: a
+    # group-readable credentials file read through secret() warns once and still returns.
+    if os.name != "posix":
+        pytest.skip("POSIX permission bits only")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    credentials._warned_permissive_paths.clear()
+    path = _write_credentials(tmp_path, {"GEMINI_API_KEY": "from-file"})
+    os.chmod(path, 0o644)
+    assert credentials.secret("GEMINI_API_KEY") == "from-file"
+    assert "chmod 600" in capsys.readouterr().err
+    assert credentials.secret("GEMINI_API_KEY") == "from-file"   # warn-once, still returns
+    assert capsys.readouterr().err == ""
+
+
 def test_no_warning_when_credentials_file_is_0600(tmp_path, capsys):
     if os.name != "posix":
         pytest.skip("POSIX permission bits only")
