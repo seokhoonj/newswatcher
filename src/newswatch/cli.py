@@ -34,6 +34,7 @@ from newswatch.schedule import (
 from newswatch.sources import Source, add_source, load_sources
 from newswatch.state import read_state, write_state
 from newswatch.store import FileStore
+from newswatch.stories import group_stories
 from newswatch.summarize import summarize_article
 from newswatch.topics import Topic, add_topic, load_topics
 
@@ -165,7 +166,7 @@ def _poll_once(args: argparse.Namespace) -> int:
     if not args.no_mail:
         to = args.to or config.setting(_DIGEST_TO_ENV)
         if to:
-            send_digest(report.collected, to=to, heal_notes=heal_notes)
+            send_digest(group_stories(report.collected), to=to, heal_notes=heal_notes)
         else:
             print("newswatch: no digest recipient (set --to or NEWSWATCH_DIGEST_TO); "
                   "not mailing", file=sys.stderr)
