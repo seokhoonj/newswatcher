@@ -9,6 +9,9 @@ one scheduled task named ``newswatch-poll``. Interval parsing accepts plain minu
 
 from __future__ import annotations
 
+import codecs
+import ctypes
+import locale
 import os
 import shutil
 import subprocess
@@ -150,8 +153,37 @@ def _schtasks_bin() -> str:
     return found
 
 
+def _console_codepage() -> int:
+    """The Windows console output codepage, or 0 when there is no console to ask."""
+    try:
+        return int(ctypes.windll.kernel32.GetConsoleOutputCP())   # type: ignore[attr-defined]
+    except (AttributeError, OSError, ValueError):
+        return 0   # not Windows, or no console attached (a scheduled task, a GUI parent)
+
+
+def _console_encoding() -> str:
+    """The encoding schtasks writes in. A console tool emits text in the *console output*
+    codepage, which need not be Python's locale encoding: on a Korean-locale machine whose
+    console is UTF-8 (``chcp 65001``), decoding as cp949 raises inside subprocess's reader
+    thread, which drops the output entirely and leaves ``stdout`` None. Ask the OS instead,
+    and fall back to the locale encoding when there is no console or no such codec."""
+    codepage = _console_codepage()
+    if codepage:
+        name = "utf-8" if codepage == 65001 else f"cp{codepage}"
+        try:
+            codecs.lookup(name)
+        except LookupError:
+            pass
+        else:
+            return name
+    return locale.getpreferredencoding(False)
+
+
 def _schtasks(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run([_schtasks_bin(), *args], capture_output=True, text=True)
+    # errors="replace" so an unexpected byte degrades one character rather than losing the
+    # whole run; everything read back from schtasks (the task name, the exit code) is ASCII.
+    result = subprocess.run([_schtasks_bin(), *args], capture_output=True,
+                            encoding=_console_encoding(), errors="replace")
     if check and result.returncode != 0:
         raise ScheduleError(f"could not run schtasks: {result.stderr.strip()}")
     return result

@@ -206,3 +206,36 @@ def test_windows_remove_when_absent(monkeypatch):
     assert schedule.poll_status() is None
     assert schedule.remove_poll() is False          # nothing to delete
     assert not any("/Delete" in c for c in calls)
+
+
+# --- schtasks output decoding: the console codepage is not the locale encoding -----------
+
+def test_console_encoding_prefers_the_console_codepage(monkeypatch):
+    monkeypatch.setattr(schedule, "_console_codepage", lambda: 949)
+    assert schedule._console_encoding() == "cp949"
+
+
+def test_console_encoding_maps_utf8_codepage(monkeypatch):
+    # A Korean-locale machine running chcp 65001: decoding as cp949 used to raise inside
+    # subprocess's reader thread, drop stdout, and crash poll_status with AttributeError.
+    monkeypatch.setattr(schedule, "_console_codepage", lambda: 65001)
+    assert schedule._console_encoding() == "utf-8"
+
+
+def test_console_encoding_falls_back_without_a_console(monkeypatch):
+    import locale
+    monkeypatch.setattr(schedule, "_console_codepage", lambda: 0)
+    assert schedule._console_encoding() == locale.getpreferredencoding(False)
+
+
+def test_console_encoding_falls_back_on_unknown_codepage(monkeypatch):
+    import locale
+    monkeypatch.setattr(schedule, "_console_codepage", lambda: 99999)
+    assert schedule._console_encoding() == locale.getpreferredencoding(False)
+
+
+def test_console_codepage_is_zero_off_windows(monkeypatch):
+    # ctypes.windll exists only on Windows; asking elsewhere must degrade, not raise.
+    import ctypes
+    monkeypatch.delattr(ctypes, "windll", raising=False)
+    assert schedule._console_codepage() == 0
