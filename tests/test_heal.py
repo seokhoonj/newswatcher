@@ -102,3 +102,10 @@ def test_heal_empty_sources_reports_failure_without_aborting(monkeypatch):
     notes = heal.heal_empty_sources((BROKEN,), gate=_GATE, state=st)
     assert notes and "무RSS" in notes[0]
     assert st.empty_polls_by_source["무RSS"] == 2   # not cleared on failure
+
+
+def test_validates_rejects_a_malformed_proposed_selector():
+    # A bad LLM-proposed selector (the ::attr Scrapy idiom) must count as a rejected
+    # candidate -- _validates returns False -- not raise out and crash the poll/watch.
+    bad = Source("x", kind="crawl", url="u", item="li::attr(href)", title="a", link="a@href")
+    assert heal._validates("<html><li>x</li></html>", bad) is False

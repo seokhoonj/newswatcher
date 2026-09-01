@@ -10,9 +10,8 @@ from typing import TYPE_CHECKING
 
 import trafilatura
 from bs4 import BeautifulSoup
-from soupsieve import SelectorSyntaxError
 
-from newswatcher.errors import SourceError
+from newswatcher._select import select_one
 from newswatcher.feed import FeedItem
 from newswatcher.http import get
 from newswatcher.robots import RobotsGate
@@ -42,12 +41,7 @@ def extract_body(html: str, source: Source) -> str:
     Returns "" when neither yields text (a summary step then falls back to the feed
     title/summary)."""
     if source.body_selector:
-        try:
-            node = BeautifulSoup(html, "lxml").select_one(source.body_selector)
-        except SelectorSyntaxError as err:
-            raise SourceError(
-                f"source {source.name!r}: invalid body_selector "
-                f"{source.body_selector!r}: {err}") from err
+        node = select_one(BeautifulSoup(html, "lxml"), source.body_selector, source.name)
         return node.get_text(" ", strip=True) if node is not None else ""
     extracted = trafilatura.extract(html, include_comments=False, include_tables=False)
     return (extracted or "").strip()

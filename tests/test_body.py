@@ -27,6 +27,13 @@ def test_malformed_body_selector_raises_sourceerror():
         extract_body("<html><div>x</div></html>", src)
 
 
+def test_unsupported_pseudo_body_selector_raises_sourceerror():
+    src = Source("s", kind="crawl", url="u", topics=("t",), item="li",
+                 title="a", link="a@href", body_selector="div::text")
+    with pytest.raises(SourceError):
+        extract_body("<html><div>x</div></html>", src)
+
+
 def test_falls_back_to_generic_when_no_selector():
     src = Source("s", kind="rss", url="u", topics=("t",))
     body = extract_body(PAGE, src)

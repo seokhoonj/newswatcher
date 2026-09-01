@@ -22,6 +22,15 @@ def test_malformed_item_selector_raises_sourceerror_not_soupsieve():
         extract_items("<html><a>x</a></html>", src)
 
 
+def test_unsupported_pseudo_selector_raises_sourceerror():
+    # soupsieve raises NotImplementedError (not SelectorSyntaxError) for ::attr/::text -- the
+    # Scrapy pseudo-element idiom an LLM healer emits; it must still become a SourceError.
+    src = Source("x", kind="crawl", url="https://e.com/list",
+                 item="li::attr(href)", title="a", link="a@href")
+    with pytest.raises(SourceError):
+        extract_items("<html><li>x</li></html>", src)
+
+
 def test_malformed_row_selector_raises_sourceerror():
     # The bad selector is on title/link (the per-row select), not item.
     src = Source("x", kind="crawl", url="https://e.com/list",

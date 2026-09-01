@@ -19,7 +19,7 @@ from thinchat.errors import ThinchatError
 
 from newswatcher._llm import DEFAULT_PROVIDER, make_llm_client, scrub_exception, scrub_secrets
 from newswatcher.crawl import extract_items
-from newswatcher.errors import HealError, NewswatcherError
+from newswatcher.errors import HealError, NewswatcherError, SourceError
 from newswatcher.http import get
 from newswatcher.robots import RobotsGate
 from newswatcher.sources import Source, update_selectors
@@ -147,7 +147,10 @@ def _validates(html: str, candidate: Source) -> bool:
     non-empty title and link from ``html``."""
     if not (candidate.item and candidate.title and candidate.link):
         return False
-    items = extract_items(html, candidate)
+    try:
+        items = extract_items(html, candidate)
+    except SourceError:
+        return False   # a malformed proposed selector is a rejected candidate, not a run error
     good = [it for it in items if it.title and it.link]
     return len(good) >= _MIN_VALID_ROWS
 
