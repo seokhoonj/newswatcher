@@ -83,10 +83,13 @@ def scrub_exception(err: BaseException, *, extra_key: str | None = None) -> Base
     node: BaseException | None = err
     while node is not None and id(node) not in seen:
         seen.add(id(node))
-        if node.args:
-            node.args = tuple(
-                scrub_secrets(a, extra_key=extra_key) if isinstance(a, str) else a
-                for a in node.args)
+        try:
+            if node.args:
+                node.args = tuple(
+                    scrub_secrets(a, extra_key=extra_key) if isinstance(a, str) else a
+                    for a in node.args)
+        except Exception:
+            pass   # a subclass whose args read/set raises -- other links are still scrubbed
         # A transport error carries the fetched URL -- and thus a query-string key -- on the
         # exception and on its .request/.response; scrub those too, best-effort. Every access
         # is wrapped: httpx (anthropic/openai backends) spells .request and .url as properties
@@ -109,7 +112,10 @@ def scrub_exception(err: BaseException, *, extra_key: str | None = None) -> Base
                 holder.url = scrub_secrets(raw_url, extra_key=extra_key)
             except Exception:
                 pass   # a read-only or raising url property -- args/message are still redacted
-        node = node.__cause__ or node.__context__
+        try:
+            node = node.__cause__ or node.__context__
+        except Exception:
+            node = None   # a subclass whose __cause__/__context__ raises ends the walk here
     return err
 
 

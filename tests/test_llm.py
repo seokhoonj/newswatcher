@@ -172,3 +172,25 @@ def test_scrub_exception_survives_a_raising_url_property():
         top.__cause__ = cause
     # Must return the original error rather than propagating the property's RuntimeError.
     assert _llm.scrub_exception(top, extra_key="SECRET-KEY-123") is top
+
+
+def test_scrub_exception_survives_a_raising_args_or_cause():
+    # A best-effort scrubber on the error path must never raise, even for a pathological
+    # exception subclass whose args or __cause__/__context__ is itself a raising property.
+    class _RaisingArgs(Exception):
+        @property
+        def args(self):
+            raise RuntimeError("args read failed")
+
+        @args.setter
+        def args(self, value):
+            raise RuntimeError("args write failed")
+
+    class _RaisingCause(Exception):
+        @property
+        def __cause__(self):  # type: ignore[override]  # deliberately raises on read
+            raise RuntimeError("cause read failed")
+
+    assert _llm.scrub_exception(_RaisingArgs("boom")) is not None
+    err = _RaisingCause("boom")
+    assert _llm.scrub_exception(err) is err
