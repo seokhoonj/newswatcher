@@ -93,6 +93,16 @@ def test_threshold_is_tunable():
     assert len(group_stories(pair, threshold=0.10)) == 1   # everything merges when loose
 
 
+def test_also_reported_by_excludes_the_leads_own_outlet():
+    # A same-outlet re-headline (an original and its later 종합/update from the same
+    # source) is still folded, but must not read as "also reported by: <the lead's outlet>".
+    lead = _article("사고 속보", source="yonhap")
+    same_outlet_update = _article("사고 속보 종합", source="yonhap")
+    other_outlet = _article("사고 속보 상보", source="hankyung")
+    story = Story(lead=lead, duplicates=(same_outlet_update, other_outlet))
+    assert story.also_reported_by == ("hankyung",)   # yonhap is the lead, not "also"
+
+
 def test_also_reported_by_drops_repeat_source_names_in_order():
     lead = _article("사고 속보", source="a")
     dup_b = _article("사고 속보!", source="b")

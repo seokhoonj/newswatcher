@@ -47,11 +47,14 @@ class Story:
 
     @property
     def also_reported_by(self) -> tuple[str, ...]:
-        """The duplicates' source names, in first-seen order without repeats -- what the
-        digest lists under the lead as also covering the story."""
+        """The *other* outlets that ran the story, in first-seen order without repeats --
+        what the digest lists under the lead. The lead's own outlet is excluded, so a
+        same-outlet update folded under it (an original and its later re-headline) is not
+        printed as the lead reporting on itself."""
         seen: dict[str, None] = {}
         for article in self.duplicates:
-            seen.setdefault(article.source_name, None)
+            if article.source_name != self.lead.source_name:
+                seen.setdefault(article.source_name, None)
         return tuple(seen)
 
 
