@@ -18,7 +18,7 @@ import time
 from newswatch import __version__, config
 from newswatch._llm import DEFAULT_PROVIDER, validate_provider
 from newswatch.digest import send_digest
-from newswatch.errors import NewswatchError
+from newswatch.errors import ConfigError, NewswatchError
 from newswatch.feed import parse_feed
 from newswatch.heal import heal_empty_sources, heal_source
 from newswatch.http import default_gate, get, new_session
@@ -34,7 +34,7 @@ from newswatch.schedule import (
 from newswatch.sources import Source, add_source, load_sources
 from newswatch.state import read_state, write_state
 from newswatch.store import FileStore
-from newswatch.stories import group_stories
+from newswatch.stories import DEFAULT_THRESHOLD, group_stories
 from newswatch.summarize import summarize_article
 from newswatch.topics import Topic, add_topic, load_topics
 
@@ -42,6 +42,7 @@ __all__ = ["main"]
 
 _DIGEST_TO_ENV = "NEWSWATCH_DIGEST_TO"
 _DIGEST_PUSH_ENV = "NEWSWATCH_DIGEST_PUSH"
+_DEDUP_THRESHOLD_ENV = "NEWSWATCH_DEDUP_THRESHOLD"
 _LLM_PROVIDER_ENV = "NEWSWATCH_LLM_PROVIDER"
 _LLM_MODEL_ENV = "NEWSWATCH_LLM_MODEL"
 
@@ -59,6 +60,27 @@ def _resolve_llm_choice(args: argparse.Namespace) -> tuple[str, str | None]:
     validate_provider(provider)   # fail fast on a typo, with the valid choices
     model = args.model or config.setting(_LLM_MODEL_ENV)
     return provider, model
+
+
+def _resolve_dedup_threshold() -> float:
+    """How similar two headlines must be (0.0-1.0) to collapse as one story: the
+    ``NEWSWATCH_DEDUP_THRESHOLD`` setting, or the built-in default when unset.
+
+    Raises:
+        ConfigError: the setting is present but not a number in ``[0, 1]`` -- caught here so
+            a typo fails fast with the valid range, not silently disabling the collapse.
+    """
+    raw = config.setting(_DEDUP_THRESHOLD_ENV)
+    if raw is None:
+        return DEFAULT_THRESHOLD
+    try:
+        value = float(raw)
+    except ValueError as err:
+        raise ConfigError(
+            f"{_DEDUP_THRESHOLD_ENV} must be a number between 0 and 1, got {raw!r}") from err
+    if not 0.0 <= value <= 1.0:
+        raise ConfigError(f"{_DEDUP_THRESHOLD_ENV} must be between 0 and 1, got {value}")
+    return value
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -168,7 +190,8 @@ def _poll_once(args: argparse.Namespace) -> int:
         email_to = args.to or config.setting(_DIGEST_TO_ENV)
         push_to = args.push or config.setting(_DIGEST_PUSH_ENV)
         if email_to or push_to:
-            for failure in send_digest(group_stories(report.collected), email_to=email_to,
+            stories = group_stories(report.collected, threshold=_resolve_dedup_threshold())
+            for failure in send_digest(stories, email_to=email_to,
                                        push_to=push_to, heal_notes=heal_notes):
                 # A partial failure (one channel down, another delivered): report it, but do
                 # not abort -- the watermark still advances, so the delivered channel is not

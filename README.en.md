@@ -136,7 +136,9 @@ The `item`, `title`, and `link` selectors are required for crawl sources;
 Non-secret settings can also be placed in `config.toml`. Environment variables
 take precedence over corresponding settings there. For example,
 `NEWSWATCH_DIGEST_TO` maps to `digest_to`, and `NEWSWATCH_DIGEST_PUSH` to `digest_push`.
-The article archive and run state use
+`NEWSWATCH_DEDUP_THRESHOLD` (`dedup_threshold`, 0.0–1.0, default 0.5) sets how alike two
+headlines must be to collapse as one story — raise it to merge less, lower it to merge
+more. The article archive and run state use
 the XDG data and state directories; `NEWSWATCH_DATA_DIR` and
 `NEWSWATCH_STATE_DIR` can override them.
 

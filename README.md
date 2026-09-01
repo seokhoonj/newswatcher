@@ -133,7 +133,8 @@ crawl 소스에는 `item`, `title`, `link` selector (HTML에서 원하는 요소
 
 비밀이 아닌 설정은 `config.toml`에도 둘 수 있습니다. 환경 변수가 같은 설정 파일
 값보다 우선합니다. 예를 들어 `NEWSWATCH_DIGEST_TO`는 `digest_to`에, `NEWSWATCH_DIGEST_PUSH`는
-`digest_push`에 대응합니다.
+`digest_push`에 대응합니다. `NEWSWATCH_DEDUP_THRESHOLD`(`dedup_threshold`, 0.0~1.0, 기본 0.5)은
+두 헤드라인이 얼마나 비슷해야 한 사건으로 묶일지를 정합니다 — 높이면 덜 묶고, 낮추면 더 묶습니다.
 기사 archive (지속적으로 보관하는 기록)와 실행 상태는 XDG data/state 디렉터리를
 사용하며, `NEWSWATCH_DATA_DIR`와 `NEWSWATCH_STATE_DIR`로 위치를 바꿀 수 있습니다.
 

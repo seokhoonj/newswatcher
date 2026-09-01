@@ -23,12 +23,12 @@ from dataclasses import dataclass
 
 from newswatch.store import Article
 
-__all__ = ["Story", "group_stories", "title_similarity"]
+__all__ = ["DEFAULT_THRESHOLD", "Story", "group_stories", "title_similarity"]
 
 # char-bigram Jaccard: near-identical headlines run high (0.7+), merely-related ones low
-# (<0.3), so 0.5 separates them. Provisional until tuned against real feeds; exposed as a
-# keyword on group_stories so tuning needs no code change.
-_DEFAULT_THRESHOLD = 0.5
+# (<0.3), so 0.5 separates them. A sensible default, not a universal one -- the right cut
+# depends on a reader's feed mix, so it is a keyword here and a setting in the CLI.
+DEFAULT_THRESHOLD = 0.5
 
 # Below this a title yields too few bigrams to score stably (a one- or two-character
 # headline), so those compare by exact normalized equality instead of Jaccard.
@@ -56,7 +56,7 @@ class Story:
 
 
 def group_stories(articles: tuple[Article, ...], *,
-                  threshold: float = _DEFAULT_THRESHOLD) -> tuple[Story, ...]:
+                  threshold: float = DEFAULT_THRESHOLD) -> tuple[Story, ...]:
     """Fold ``articles`` into stories by title similarity, preserving the order in which
     each story's lead first appears. Greedy first-fit: each article joins the first
     earlier lead it is similar enough to (``>= threshold``), or starts a new story. That

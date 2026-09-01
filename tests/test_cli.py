@@ -134,6 +134,14 @@ def _poll_returning_one(monkeypatch):
     return writes
 
 
+def _stub_send_digest(record: list[int]):
+    """A send_digest double that records each call and reports no delivery failures."""
+    def _send(*args, **kwargs):
+        record.append(1)
+        return ()
+    return _send
+
+
 def test_poll_does_not_persist_state_when_mail_fails(monkeypatch, tmp_path):
     from newswatch.errors import DigestError
     _xdg(monkeypatch, tmp_path)
@@ -150,8 +158,8 @@ def test_poll_does_not_persist_state_when_mail_fails(monkeypatch, tmp_path):
 def test_poll_persists_state_after_successful_mail(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     writes = _poll_returning_one(monkeypatch)
-    sent = []
-    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1) or ())
+    sent: list[int] = []
+    monkeypatch.setattr(cli, "send_digest", _stub_send_digest(sent))
     assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 0
     assert sent == [1] and writes == [1]
 
@@ -184,11 +192,31 @@ def test_poll_warns_and_sends_nothing_when_no_destination_is_configured(
     monkeypatch.delenv("NEWSWATCH_DIGEST_TO", raising=False)
     monkeypatch.delenv("NEWSWATCH_DIGEST_PUSH", raising=False)
     _poll_returning_one(monkeypatch)
-    sent = []
-    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1) or ())
+    sent: list[int] = []
+    monkeypatch.setattr(cli, "send_digest", _stub_send_digest(sent))
     assert cli.main(["poll", "--no-heal", "--no-store"]) == 0
     assert sent == []                                       # nothing delivered
     assert "no digest destination" in capsys.readouterr().err
+
+
+def test_poll_reads_the_dedup_threshold_from_the_setting(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "0.8")
+    _poll_returning_one(monkeypatch)
+    seen: dict[str, float] = {}
+    monkeypatch.setattr(cli, "group_stories",
+                        lambda arts, *, threshold: seen.update(threshold=threshold) or ())
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: ())
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 0
+    assert seen["threshold"] == 0.8
+
+
+def test_poll_rejects_a_nonnumeric_dedup_threshold(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "aggressive")
+    _poll_returning_one(monkeypatch)
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
+    assert "NEWSWATCH_DEDUP_THRESHOLD" in capsys.readouterr().err
 
 
 def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
