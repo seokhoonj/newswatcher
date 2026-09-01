@@ -62,13 +62,13 @@ def needs_heal(source: Source, state: State) -> bool:
 
 def heal_source(
     source: Source, *, gate: RobotsGate | None, session: requests.Session | None = None,
-    apply: bool = True, path: Path | None = None,
+    should_apply: bool = True, path: Path | None = None,
     provider: str = DEFAULT_PROVIDER, model: str | None = None, api_key: str | None = None,
 ) -> HealResult | None:
     """Attempt to repair ``source``'s selectors. Returns None when the source is
     healthy (its current ``item`` selector still extracts rows from the live page).
     Otherwise proposes new selectors, validates them against the fetched HTML, and —
-    when ``apply`` and validation passed — writes them to ``sources.toml`` and returns a
+    when ``should_apply`` and validation passed — writes them to ``sources.toml`` and returns a
     ``HealResult`` describing the change (or a rejected proposal when validation
     failed).
 
@@ -88,10 +88,10 @@ def heal_source(
             source_name=source.name, old=old, new=proposed, applied=False,
             note=f"proposed selectors for {source.name!r} did not extract; not applied")
     changes = {k: v for k, v in proposed.items() if k in _HEALABLE_SELECTOR_FIELDS and v}
-    if apply:
+    if should_apply:
         update_selectors(source.name, changes, path)
     diff = ", ".join(f"{k}: {old.get(k, '-')!r} -> {v!r}" for k, v in changes.items())
-    return HealResult(source_name=source.name, old=old, new=changes, applied=apply,
+    return HealResult(source_name=source.name, old=old, new=changes, applied=should_apply,
                       note=f"repaired {source.name!r} selectors ({diff})")
 
 
@@ -108,7 +108,7 @@ def heal_empty_sources(
         if not needs_heal(source, state):
             continue
         try:
-            result = heal_source(source, gate=gate, session=session, apply=True,
+            result = heal_source(source, gate=gate, session=session, should_apply=True,
                                  provider=provider, model=model)
         except NewswatcherError as err:
             notes.append(f"heal of {source.name!r} failed: {err}")

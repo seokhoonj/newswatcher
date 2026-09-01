@@ -29,6 +29,22 @@ __all__ = [
 DEFAULT_INTERVAL_MINUTES = 30
 _MARKER = "# newswatcher-poll"      # POSIX crontab marker comment
 _TASK_NAME = "newswatcher-poll"     # Windows scheduled-task name (the schtasks marker)
+_SUBPROCESS_TIMEOUT = 20            # seconds; a hung crontab/schtasks must not hang the CLI
+
+
+def _run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    """Run a scheduler command with a timeout, converting a failure to launch it (missing
+    exec, permission) or a hang into ``ScheduleError`` -- so ``install``/``status``/``remove``
+    surface a one-line error rather than a raw OSError or an indefinite block.
+
+    Raises:
+        ScheduleError: the command could not be started or did not finish in time.
+    """
+    try:
+        return subprocess.run(  # type: ignore[call-overload, no-any-return]
+            command, timeout=_SUBPROCESS_TIMEOUT, **kwargs)
+    except (OSError, subprocess.TimeoutExpired) as err:
+        raise ScheduleError(f"could not run {command[0]!r}: {err}") from err
 
 
 def _is_windows() -> bool:
@@ -214,8 +230,8 @@ def _schtasks(*args: str, check: bool = True) -> subprocess.CompletedProcess[str
     # losing the whole run. What newswatcher *parses* is ASCII -- the exit code, and the XML
     # element names below -- but the trailing columns and stderr are localized, so a wrong
     # codepage still shows the user mojibake instead of their own language.
-    result = subprocess.run([_schtasks_bin(), *args], capture_output=True,
-                            encoding=_console_encoding(), errors="replace")
+    result = _run([_schtasks_bin(), *args], capture_output=True,
+                  encoding=_console_encoding(), errors="replace")
     if check and result.returncode != 0:
         raise ScheduleError(f"could not run schtasks: {result.stderr.strip()}")
     return result
@@ -299,7 +315,7 @@ def _crontab_bin() -> str:
 
 
 def _read_crontab() -> list[str]:
-    result = subprocess.run([_crontab_bin(), "-l"], capture_output=True, text=True)
+    result = _run([_crontab_bin(), "-l"], capture_output=True, text=True)
     if result.returncode != 0 and "no crontab" not in result.stderr.lower():
         raise ScheduleError(f"could not read crontab: {result.stderr.strip()}")
     return [ln for ln in result.stdout.splitlines() if ln.strip()]
@@ -307,7 +323,7 @@ def _read_crontab() -> list[str]:
 
 def _write_crontab(lines: list[str]) -> None:
     payload = "\n".join(lines) + "\n" if lines else ""
-    result = subprocess.run([_crontab_bin(), "-"], input=payload, text=True,
-                            capture_output=True)
+    result = _run([_crontab_bin(), "-"], input=payload, text=True,
+                  capture_output=True)
     if result.returncode != 0:
         raise ScheduleError(f"could not write crontab: {result.stderr.strip()}")

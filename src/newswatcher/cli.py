@@ -252,7 +252,7 @@ def _run_heal(args: argparse.Namespace) -> int:
         if source.kind != "crawl":
             continue
         try:
-            result = heal_source(source, gate=gate, apply=not args.dry_run,
+            result = heal_source(source, gate=gate, should_apply=not args.dry_run,
                                  provider=provider, model=model)
         except NewswatcherError as err:
             # One source's failure must not stop the rest (the package invariant).

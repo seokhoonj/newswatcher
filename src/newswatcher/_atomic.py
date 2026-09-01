@@ -21,10 +21,13 @@ def write_bytes_atomic(path: Path, data: bytes, error_cls: type[Exception]) -> N
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
-        os.close(fd)
         tmp = Path(tmp_name)
         try:
-            tmp.write_bytes(data)
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())   # flush to disk before the rename, so a crash
+                                            # after os.replace cannot leave a half-written file
             os.replace(tmp, path)
         except OSError:
             tmp.unlink(missing_ok=True)

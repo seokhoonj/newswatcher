@@ -82,3 +82,37 @@ def test_non_string_value_is_no_secret(monkeypatch, tmp_path, value):
     _write_credentials(tmp_path, {"GEMINI_API_KEY": value})
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert credentials.secret("GEMINI_API_KEY") is None
+
+
+def test_warns_once_when_credentials_file_is_group_readable(tmp_path, capsys):
+    import os
+
+    import pytest
+
+    from newswatcher import credentials
+    if os.name != "posix":
+        pytest.skip("POSIX permission bits only")
+    credentials._warned_permissive.clear()
+    p = tmp_path / "credentials.json"
+    p.write_text("{}", encoding="utf-8")
+    os.chmod(p, 0o644)
+    credentials._warn_if_group_or_world_readable(p)
+    assert "chmod 600" in capsys.readouterr().err
+    credentials._warn_if_group_or_world_readable(p)      # warn-once
+    assert capsys.readouterr().err == ""
+
+
+def test_no_warning_when_credentials_file_is_0600(tmp_path, capsys):
+    import os
+
+    import pytest
+
+    from newswatcher import credentials
+    if os.name != "posix":
+        pytest.skip("POSIX permission bits only")
+    credentials._warned_permissive.clear()
+    p = tmp_path / "credentials.json"
+    p.write_text("{}", encoding="utf-8")
+    os.chmod(p, 0o600)
+    credentials._warn_if_group_or_world_readable(p)
+    assert capsys.readouterr().err == ""

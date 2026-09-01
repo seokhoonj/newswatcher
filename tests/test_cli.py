@@ -367,7 +367,7 @@ def test_heal_threads_provider_to_heal_source(monkeypatch, tmp_path):
     from newswatcher.sources import Source
     captured = {}
 
-    def fake_heal_source(source, *, gate, apply, provider, model, **kwargs):
+    def fake_heal_source(source, *, gate, should_apply, provider, model, **kwargs):
         captured["provider"] = provider
         captured["model"] = model
         return None

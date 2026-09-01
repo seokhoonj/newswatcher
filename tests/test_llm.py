@@ -139,3 +139,16 @@ def test_make_llm_client_missing_key_raises(monkeypatch, tmp_path):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     with pytest.raises(LLMError):
         _llm.make_llm_client(max_tokens=100, action="summarizing")
+
+
+def test_scrub_exception_redacts_a_url_attribute():
+    from newswatcher._llm import scrub_exception
+
+    class _Transport(Exception):
+        url: str
+
+    e = _Transport("call failed")
+    e.url = "https://generativelanguage.googleapis.com/v1?key=SECRET-KEY-123"
+    scrub_exception(e, extra_key="SECRET-KEY-123")
+    scrubbed = e.url
+    assert "SECRET-KEY-123" not in scrubbed and "***" in scrubbed

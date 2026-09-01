@@ -9,6 +9,8 @@ backend for the light summary task."""
 
 from __future__ import annotations
 
+from typing import Any
+
 from thinchat import PROVIDERS, Client, make_client
 from thinchat.errors import ThinchatError
 from thinchat.keys import ENV_BY_PROVIDER
@@ -71,9 +73,11 @@ def scrub_exception(err: BaseException, *, extra_key: str | None = None) -> Base
     ``logging.exception`` (or lets the error propagate to a traceback) prints the entire
     chained cause, where a provider library -- or the transport error beneath it, which
     Gemini spells with the key in a URL query -- still carries the raw key. Walking the
-    chain and rewriting each exception's ``args`` makes the redaction hold no matter how
-    the error is later rendered. Returns ``err`` so it reads as
-    ``raise LLMError(...) from scrub_exception(err)``.
+    chain and rewriting each exception's ``args`` (the source of ``str()`` and the
+    traceback) plus the ``url`` attribute a transport error attaches (``err.request.url`` /
+    ``err.response.url``, where Gemini's key lives) covers the standard renderings; a caller
+    that reads some other custom attribute directly is on its own. Returns ``err`` so it
+    reads as ``raise LLMError(...) from scrub_exception(err)``.
     """
     seen: set[int] = set()
     node: BaseException | None = err
@@ -83,6 +87,16 @@ def scrub_exception(err: BaseException, *, extra_key: str | None = None) -> Base
             node.args = tuple(
                 scrub_secrets(a, extra_key=extra_key) if isinstance(a, str) else a
                 for a in node.args)
+        # A transport error (requests) carries the fetched URL -- and thus a query-string key
+        # -- on the exception and on its .request/.response; scrub those too, best-effort.
+        holders: list[Any] = [node, getattr(node, "request", None), getattr(node, "response", None)]
+        for holder in holders:
+            raw_url = getattr(holder, "url", None)
+            if isinstance(raw_url, str):
+                try:
+                    holder.url = scrub_secrets(raw_url, extra_key=extra_key)
+                except (AttributeError, TypeError):
+                    pass   # a read-only url property -- args/message are still redacted
         node = node.__cause__ or node.__context__
     return err
 

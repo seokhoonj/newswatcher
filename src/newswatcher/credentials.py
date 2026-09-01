@@ -22,12 +22,15 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 from newswatcher.config import config_dir
 from newswatcher.errors import ConfigError
 
 __all__ = ["credentials_path", "secret"]
+
+_warned_permissive: set[str] = set()
 
 
 def credentials_path() -> Path:
@@ -71,6 +74,7 @@ def _secret_from_file(name: str) -> str | None:
         # UnicodeDecodeError is a ValueError, not an OSError, so a non-UTF-8 file must be
         # named explicitly or it escapes this boundary as a bare traceback.
         raise ConfigError(f"could not read {path}: {err}") from err
+    _warn_if_group_or_world_readable(path)
     try:
         secret_by_name = json.loads(text)
     except json.JSONDecodeError as err:
@@ -79,3 +83,19 @@ def _secret_from_file(name: str) -> str | None:
         raise ConfigError(f"{path} must contain a JSON object of name to key")
     key = secret_by_name.get(name)
     return key.strip() if isinstance(key, str) and key.strip() else None
+
+
+def _warn_if_group_or_world_readable(path: Path) -> None:
+    """Warn once (POSIX only) when the credentials file is readable by group or others -- a
+    secret file should be mode 0600. Best-effort: a stat failure is ignored (the read that
+    called this already succeeded), and Windows POSIX bits do not apply."""
+    if os.name != "posix" or str(path) in _warned_permissive:
+        return
+    try:
+        mode = path.stat().st_mode
+    except OSError:
+        return
+    if mode & 0o077:
+        _warned_permissive.add(str(path))
+        print(f"newswatcher: warning: {path} is readable by group/other; "
+              f"restrict it with 'chmod 600'", file=sys.stderr)
