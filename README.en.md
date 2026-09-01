@@ -84,6 +84,23 @@ A site with no feed can still be followed with a `--kind crawl` source.
 | The Korea Herald | English | `https://www.koreaherald.com/rss/newsAll` |
 | The Korea Times | English | `https://feed.koreatimes.co.kr/k/allnews.xml` |
 
+A representative set of verified international (English) feeds is below; the full
+list, grouped by category and marked with which outlets paywall the article body,
+is in [docs/world-news-rss.md](docs/world-news-rss.md). Pair these with English
+topic keywords.
+
+| Outlet | Beat | Feed URL |
+|--------|------|----------|
+| BBC News | wire | `https://feeds.bbci.co.uk/news/world/rss.xml` |
+| The Guardian | wire | `https://www.theguardian.com/world/rss` |
+| Al Jazeera | wire | `https://www.aljazeera.com/xml/rss/all.xml` |
+| The New York Times | world | `https://rss.nytimes.com/services/xml/rss/nyt/World.xml` |
+| CNBC | economy | `https://www.cnbc.com/id/100003114/device/rss/rss.html` |
+| MarketWatch | economy | `http://feeds.marketwatch.com/marketwatch/topstories/` |
+| TechCrunch | tech | `https://techcrunch.com/feed/` |
+| The Verge | tech | `https://www.theverge.com/rss/index.xml` |
+| Nature | science | `https://www.nature.com/nature.rss` |
+
 ## Configuration files
 
 newswatch stores hand-edited configuration under

@@ -83,6 +83,22 @@ newswatch poll
 | The Korea Herald | 영문 | `https://www.koreaherald.com/rss/newsAll` |
 | The Korea Times | 영문 | `https://feed.koreatimes.co.kr/k/allnews.xml` |
 
+검증된 해외(영어) 피드의 대표 목록은 아래와 같고, 카테고리별로 나누고 어느 매체가 본문을
+페이월로 막는지 표시한 전체 목록은 [docs/world-news-rss.md](docs/world-news-rss.md)에
+있습니다. 이 피드에는 영어 토픽 키워드를 씁니다.
+
+| 매체 | 분야 | 피드 URL |
+|------|------|----------|
+| BBC News | 통신 | `https://feeds.bbci.co.uk/news/world/rss.xml` |
+| The Guardian | 통신 | `https://www.theguardian.com/world/rss` |
+| Al Jazeera | 통신 | `https://www.aljazeera.com/xml/rss/all.xml` |
+| The New York Times | 국제 | `https://rss.nytimes.com/services/xml/rss/nyt/World.xml` |
+| CNBC | 경제 | `https://www.cnbc.com/id/100003114/device/rss/rss.html` |
+| MarketWatch | 경제 | `http://feeds.marketwatch.com/marketwatch/topstories/` |
+| TechCrunch | IT | `https://techcrunch.com/feed/` |
+| The Verge | IT | `https://www.theverge.com/rss/index.xml` |
+| Nature | 과학 | `https://www.nature.com/nature.rss` |
+
 ## 설정 파일
 
 newswatch는 직접 편집하는 설정을 `$XDG_CONFIG_HOME/newswatch`에 저장합니다.
