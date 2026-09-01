@@ -45,7 +45,8 @@ Run `newswatch --help` or `newswatch <command> --help` for every option;
 - `poll` / `watch [--every N]` — collect → summarize → mail once, or repeat on an interval in the foreground. Both accept `--to ADDRESS` (digest recipient), `--no-mail`, `--no-store`, `--no-heal`, and the LLM `--provider` / `--model` flags.
 - `articles [--topic NAME] [--since DATE] [--until DATE]` — list archived articles.
 - `heal [--dry-run] [--provider P] [--model M]` — check and repair crawl selectors that stopped matching.
-- `schedule install|status|remove [--every N]` — register the recurring poll with cron.
+- `schedule install|status|remove [--every N]` — register the recurring poll with the OS
+  scheduler.
 
 ## News feeds
 
@@ -159,7 +160,7 @@ bodies are transient summary input and are neither archived nor emailed.
 
 ## Scheduling
 
-Install a recurring cron poll every 30 minutes:
+Install a recurring poll every 30 minutes:
 
 ```sh
 newswatch schedule install
@@ -181,6 +182,13 @@ rejects the rest rather than mis-scheduling them. The scheduled process uses the
 configuration as an interactive poll, so make sure the LLM key is reachable (from
 `credentials.json` or its environment variable) along with any settings not stored
 in `config.toml`.
+
+On Windows the task is registered under the installing user and runs in their
+interactive session, so it does not fire while nobody is signed in — a locked screen is
+fine, a machine sitting at the sign-in screen is not. It also inherits the Task Scheduler
+default of not starting on battery power. Check it with
+`schtasks /Query /TN newswatch-poll`. On Linux and macOS the cron job has neither
+restriction.
 
 A poll takes a single-instance lock, so a scheduled poll and a manual one never run
 at once — whichever starts second logs that a poll is already running and exits. The

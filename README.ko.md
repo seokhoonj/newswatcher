@@ -44,7 +44,7 @@ newswatch poll
 - `poll` / `watch [--every N]` — 수집 → 요약 → 발송을 한 번 수행하거나 주기적으로 포그라운드에서 반복합니다. 둘 다 `--to ADDRESS`(수신자), `--no-mail`, `--no-store`, `--no-heal`, LLM `--provider` / `--model`을 받습니다.
 - `articles [--topic NAME] [--since DATE] [--until DATE]` — archive된 기사를 나열합니다.
 - `heal [--dry-run] [--provider P] [--model M]` — 매칭이 끊긴 crawl selector를 점검하고 복구합니다.
-- `schedule install|status|remove [--every N]` — 반복 poll을 cron에 등록합니다.
+- `schedule install|status|remove [--every N]` — 반복 poll을 운영체제 스케줄러에 등록합니다.
 
 ## 뉴스 피드
 
@@ -156,8 +156,8 @@ archive하거나 이메일로 보내지 않습니다.
 
 ## 스케줄링
 
-30분마다 실행하는 cron (정해진 시각에 명령을 실행하는 운영체제 스케줄러) 작업을
-설치합니다.
+30분마다 실행하는 반복 poll을 운영체제 스케줄러(정해진 시각에 명령을 실행하는
+OS 기능)에 설치합니다.
 
 ```sh
 newswatch schedule install
@@ -178,6 +178,12 @@ Linux·macOS의 cron은 나눠떨어지는 간격(15/20/30분, 1/2/4/8/12시간,
 그 외 간격은 잘못 예약하지 않고 거부합니다. 예약 실행도 대화형 poll과 같은 설정을
 사용하므로, LLM 키가 (`credentials.json` 또는 환경 변수로) 닿는지와 `config.toml`에
 저장하지 않은 설정이 예약 실행 환경에 제공되는지 확인해야 합니다.
+
+Windows에서는 설치한 사용자의 대화형 세션으로 작업이 등록되므로, 아무도 로그인하지
+않은 상태에서는 발화하지 않습니다(화면 잠금은 괜찮지만 로그인 화면은 아닙니다). 또한
+작업 스케줄러 기본값에 따라 배터리 전원에서는 시작하지 않습니다. 확인은
+`schtasks /Query /TN newswatch-poll`로 합니다. Linux·macOS의 cron 작업에는 두 제약이
+모두 없습니다.
 
 poll은 단일 인스턴스 lock을 잡으므로 예약 poll과 수동 poll이 동시에 돌지 않습니다.
 나중에 시작한 쪽은 이미 poll이 실행 중이라고 알리고 종료합니다. lock은 Linux·macOS에서

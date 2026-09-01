@@ -291,7 +291,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_llm_flags(heal)
     heal.set_defaults(run=_run_heal)
 
-    schedule = sub.add_parser("schedule", help="register the recurring poll with cron")
+    schedule = sub.add_parser("schedule", help="register the recurring poll with the OS scheduler")
     schedule.add_argument("action", choices=("install", "remove", "status"))
     schedule.add_argument("--every", type=_interval, default=None, metavar="MINUTES")
     schedule.set_defaults(run=_run_schedule)
