@@ -158,12 +158,25 @@ def _schtasks(*args: str, check: bool = True) -> subprocess.CompletedProcess[str
 
 
 def remove_poll() -> bool:
-    """Remove the newswatch poll line; return whether one was present.
+    """Remove the newswatch poll job; return whether one was present. crontab on
+    Linux/macOS, schtasks on Windows.
 
     Raises:
-        ScheduleError: no ``crontab`` command is available, or the crontab could not be
-            read or written.
+        ScheduleError: the scheduler command is unavailable or the change failed.
     """
+    return _win_remove() if _is_windows() else _cron_remove()
+
+
+def poll_status() -> str | None:
+    """The installed newswatch poll schedule line, or None when not installed.
+
+    Raises:
+        ScheduleError: the scheduler command is unavailable or could not be queried.
+    """
+    return _win_status() if _is_windows() else _cron_status()
+
+
+def _cron_remove() -> bool:
     current = _read_crontab()
     kept = [ln for ln in current if _MARKER not in ln]
     if len(kept) == len(current):
@@ -172,17 +185,25 @@ def remove_poll() -> bool:
     return True
 
 
-def poll_status() -> str | None:
-    """The installed newswatch cron line, or None when not installed.
-
-    Raises:
-        ScheduleError: no ``crontab`` command is available, or the crontab could not be
-            read.
-    """
+def _cron_status() -> str | None:
     for line in _read_crontab():
         if _MARKER in line:
             return line
     return None
+
+
+def _win_status() -> str | None:
+    result = _schtasks("/Query", "/TN", _TASK_NAME, check=False)
+    if result.returncode != 0:
+        return None   # schtasks returns non-zero when the task does not exist
+    return next((ln for ln in result.stdout.splitlines() if _TASK_NAME in ln), None)
+
+
+def _win_remove() -> bool:
+    if _win_status() is None:
+        return False
+    _schtasks("/Delete", "/F", "/TN", _TASK_NAME)
+    return True
 
 
 def _crontab_bin() -> str:

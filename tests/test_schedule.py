@@ -185,3 +185,21 @@ def test_windows_install_quotes_the_command(monkeypatch):
     tr = calls[0][calls[0].index("/TR") + 1]
     assert tr.startswith('"C:\\Program Files\\Py\\python.exe"')   # exe with spaces is quoted
     assert "newswatch" in tr and "poll" in tr
+
+
+def test_windows_status_and_remove_when_present(monkeypatch):
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    calls: list[list[str]] = []
+    _fake_schtasks(monkeypatch, calls, query_found=True)
+    assert schedule.poll_status() is not None       # /Query found the task
+    assert schedule.remove_poll() is True           # present -> deleted
+    assert any("/Delete" in c for c in calls)
+
+
+def test_windows_remove_when_absent(monkeypatch):
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    calls: list[list[str]] = []
+    _fake_schtasks(monkeypatch, calls, query_found=False)
+    assert schedule.poll_status() is None
+    assert schedule.remove_poll() is False          # nothing to delete
+    assert not any("/Delete" in c for c in calls)
