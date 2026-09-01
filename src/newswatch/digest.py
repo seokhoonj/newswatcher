@@ -62,7 +62,8 @@ def send_digest(
     Returns the delivery failures, one message each -- empty when every configured
     destination accepted the digest. A caller that persists progress only on success can
     still do so on a *partial* failure, because the channels that did accept the digest
-    must not be re-sent.
+    must not be re-sent. The failed channel's copy of *this* digest is therefore dropped,
+    not queued for retry -- a later poll reaches it only with newer stories.
 
     Raises:
         DigestError: only when *every* configured destination failed. A caller that re-sends

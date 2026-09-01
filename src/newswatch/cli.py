@@ -204,6 +204,8 @@ def _poll_once(args: argparse.Namespace) -> int:
                   file=sys.stderr)
     # Persist the watermark only after the digest is out (or mailing was skipped): a
     # send failure then re-collects and re-sends next run rather than losing the digest.
+    # The reverse window is the accepted cost of send-before-persist: if this atomic write
+    # itself fails after a good send, next run re-sends the whole digest.
     write_state(state)
     print(f"{len(report.collected)} new article(s)")
     return 0
