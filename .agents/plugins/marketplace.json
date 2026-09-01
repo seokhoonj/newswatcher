@@ -1,0 +1,12 @@
+{
+  "name": "newswatch",
+  "interface": { "displayName": "newswatch" },
+  "plugins": [
+    {
+      "name": "newswatch",
+      "source": { "source": "local", "path": "./plugins/newswatch" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

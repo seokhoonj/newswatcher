@@ -229,3 +229,43 @@ restriction.
 A poll takes a single-instance lock, so a scheduled poll and a manual one never run
 at once — whichever starts second logs that a poll is already running and exits. The
 lock uses `flock` on Linux and macOS and `msvcrt` on Windows.
+
+## Use it from an AI coding agent
+
+This repo ships a `poll` skill: ask in plain words ("run my newswatch poll", "check the
+news") and it runs one poll and relays what it found.
+
+### Claude Code
+
+In the Claude Code chat, add the marketplace and install:
+
+```
+/plugin marketplace add seokhoonj/newswatch
+/plugin install newswatch@newswatch
+```
+
+Then invoke it with `/newswatch:poll`, or just ask in plain language. The skill calls the
+`newswatch` command, so install the package too (`pip install newswatch`). See
+`plugins/newswatch/skills/poll/SKILL.md`.
+
+### Codex
+
+In your terminal, add the marketplace and install:
+
+```
+codex plugin marketplace add seokhoonj/newswatch
+codex plugin add newswatch@newswatch
+```
+
+The `poll` skill responds automatically to matching requests.
+
+### By hand (symlink)
+
+Symlink the skill into your skills directory and call it as `/poll`:
+
+```sh
+ln -s "$PWD/plugins/newswatch/skills/poll" ~/.claude/skills/poll   # Claude Code -> /poll
+ln -s "$PWD/plugins/newswatch/skills/poll" ~/.codex/skills/poll    # Codex -> $newswatch:poll
+```
+
+Claude Code picks it up immediately; Codex needs a restart to load it.

@@ -223,3 +223,43 @@ Windows에서는 설치한 사용자의 대화형 세션으로 작업이 등록�
 poll은 단일 인스턴스 lock을 잡으므로 예약 poll과 수동 poll이 동시에 돌지 않습니다.
 나중에 시작한 쪽은 이미 poll이 실행 중이라고 알리고 종료합니다. lock은 Linux·macOS에서
 `flock`, Windows에서 `msvcrt`를 씁니다.
+
+## AI 코딩 에이전트에서 사용
+
+이 저장소에는 `poll` skill이 있습니다: "뉴스 확인해줘", "내 newswatch 폴 돌려줘"처럼
+말하면 한 번 poll을 실행하고 결과를 전달합니다.
+
+### Claude Code
+
+Claude Code 채팅창에서 마켓플레이스를 추가하고 설치합니다:
+
+```
+/plugin marketplace add seokhoonj/newswatch
+/plugin install newswatch@newswatch
+```
+
+그다음 `/newswatch:poll`(또는 자연어)로 호출합니다. skill은 `newswatch` 명령을 부르므로
+패키지도 설치돼 있어야 합니다(`pip install newswatch`). 자세한 것은
+`plugins/newswatch/skills/poll/SKILL.md`.
+
+### Codex
+
+터미널에서 마켓플레이스를 추가하고 설치합니다:
+
+```
+codex plugin marketplace add seokhoonj/newswatch
+codex plugin add newswatch@newswatch
+```
+
+`poll` skill이 관련 요청에 자동으로 반응합니다.
+
+### 플러그인 없이 (symlink)
+
+skill을 스킬 폴더에 심링크해 `/poll`로 부릅니다:
+
+```sh
+ln -s "$PWD/plugins/newswatch/skills/poll" ~/.claude/skills/poll   # Claude Code → /poll
+ln -s "$PWD/plugins/newswatch/skills/poll" ~/.codex/skills/poll    # Codex → $newswatch:poll
+```
+
+Claude Code는 바로 인식하고, Codex는 재시작해야 로딩됩니다.
