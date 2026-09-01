@@ -13,6 +13,7 @@ import codecs
 import ctypes
 import locale
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -225,10 +226,33 @@ def _cron_status() -> str | None:
 
 
 def _win_status() -> str | None:
-    result = _schtasks("/Query", "/TN", _TASK_NAME, check=False)
+    result = _schtasks("/Query", "/TN", _TASK_NAME, "/XML", check=False)
     if result.returncode != 0:
         return None   # schtasks returns non-zero when the task does not exist
-    return next((ln for ln in result.stdout.splitlines() if _TASK_NAME in ln), None)
+    return f"{_TASK_NAME}: {_win_schedule_from_xml(result.stdout)}"
+
+
+_XML_MINUTES = re.compile(r"<Interval>PT(\d+)M</Interval>")
+_XML_DAYS = re.compile(r"<DaysInterval>(\d+)</DaysInterval>")
+
+
+def _win_schedule_from_xml(xml: str) -> str:
+    """The ``/SC .. /MO ..`` summary of a task's XML, so status reports the line install
+    printed -- the crontab backend likewise reports back the line it wrote.
+
+    Task Scheduler XML is the only locale-independent view schtasks offers. Its default
+    table gives a name truncated at 40 characters plus a *localized* next-run time and
+    state, from which the interval cannot be recovered at all: a 45-minute poll and a
+    30-minute one print the same thing."""
+    minutes = _XML_MINUTES.search(xml)
+    if minutes:
+        return f"/SC MINUTE /MO {minutes.group(1)}"
+    days = _XML_DAYS.search(xml)
+    if days:
+        return f"/SC DAILY /MO {days.group(1)}"
+    return "on a schedule newswatch did not set"   # hand-edited in Task Scheduler
+
+
 
 
 def _win_remove() -> bool:

@@ -137,15 +137,22 @@ def test_status_reports_installed_line(monkeypatch):
 
 # --- Windows (schtasks) backend: unit-tested via the _is_windows seam + a fake _schtasks ---
 
-def _fake_schtasks(monkeypatch, calls, *, query_found=False):
+_TASK_XML = """<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2"><Triggers><TimeTrigger>
+<StartBoundary>2026-09-01T12:03:00</StartBoundary>
+<Repetition><Interval>PT45M</Interval></Repetition>
+</TimeTrigger></Triggers></Task>"""
+
+
+def _fake_schtasks(monkeypatch, calls, *, query_found=False, stdout=_TASK_XML):
     """Record schtasks arg lists; return a CompletedProcess-like object."""
     import subprocess
 
     def fake(*args, check=True):
         calls.append(list(args))
-        stdout = f"{schedule._TASK_NAME}   Ready\n" if query_found else ""
         rc = 0 if (query_found or "/Query" not in args) else 1
-        return subprocess.CompletedProcess(args, rc, stdout=stdout, stderr="")
+        return subprocess.CompletedProcess(args, rc, stdout=stdout if query_found else "",
+                                           stderr="")
 
     monkeypatch.setattr(schedule, "_schtasks", fake)
 
@@ -197,6 +204,34 @@ def test_windows_status_and_remove_when_present(monkeypatch):
     assert schedule.poll_status() is not None       # /Query found the task
     assert schedule.remove_poll() is True           # present -> deleted
     assert any("/Delete" in c for c in calls)
+
+
+def test_windows_status_reports_the_interval(monkeypatch):
+    # The default schtasks table gives a localized next-run time and state and no interval
+    # at all, so a 45-minute poll and a 30-minute one printed the same line. Status must
+    # report back what install printed, the way the crontab backend does.
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    calls: list[list[str]] = []
+    _fake_schtasks(monkeypatch, calls, query_found=True)
+    assert schedule.poll_status() == f"{schedule._TASK_NAME}: /SC MINUTE /MO 45"
+    assert "/XML" in calls[0]   # the only locale-independent view schtasks offers
+
+
+def test_windows_status_reports_a_daily_interval(monkeypatch):
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    daily = ("<Task><Triggers><CalendarTrigger><ScheduleByDay><DaysInterval>2"
+             "</DaysInterval></ScheduleByDay></CalendarTrigger></Triggers></Task>")
+    _fake_schtasks(monkeypatch, [], query_found=True, stdout=daily)
+    assert schedule.poll_status() == f"{schedule._TASK_NAME}: /SC DAILY /MO 2"
+
+
+def test_windows_status_survives_a_hand_edited_task(monkeypatch):
+    # Someone may have changed the trigger in Task Scheduler; status must still report the
+    # task as present rather than crash or claim it is absent.
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    _fake_schtasks(monkeypatch, [], query_found=True, stdout="<Task><Triggers/></Task>")
+    status = schedule.poll_status()
+    assert status is not None and schedule._TASK_NAME in status
 
 
 def test_windows_remove_when_absent(monkeypatch):
