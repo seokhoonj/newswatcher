@@ -95,10 +95,20 @@ def read_state(path: Path | None = None) -> State:
             f"state file {path} is corrupt ({err}); move or delete it to start fresh"
         ) from err
     if not isinstance(parsed, dict):
-        return State()
+        raise ConfigError(
+            f"state file {path} is not a JSON object; move or delete it to start fresh")
+    seen_raw = parsed.get(_SEEN_KEY, {})
+    empty_raw = parsed.get(_EMPTY_KEY, {})
+    # A present-but-wrong-shape section ({...: null}, {...: ["a"]}) would coerce to {} and
+    # then be written back over the real watermarks -- the same wipe a non-dict root causes,
+    # one level down. Only a *missing* section is fine (defaults to empty); a wrong type is
+    # corruption. (Individual bad guids/counts inside a section are still filtered, not fatal.)
+    if not isinstance(seen_raw, dict) or not isinstance(empty_raw, dict):
+        raise ConfigError(
+            f"state file {path} has a malformed section; move or delete it to start fresh")
     return State(
-        seen_guids_by_source=_str_list_pairs(parsed.get(_SEEN_KEY)),
-        empty_polls_by_source=_int_pairs(parsed.get(_EMPTY_KEY)),
+        seen_guids_by_source=_str_list_pairs(seen_raw),
+        empty_polls_by_source=_int_pairs(empty_raw),
     )
 
 

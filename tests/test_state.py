@@ -112,3 +112,31 @@ def test_read_state_raises_on_a_corrupt_file(tmp_path):
     p.write_text("{ this is not valid json", encoding="utf-8")
     with pytest.raises(ConfigError):
         read_state(p)
+
+
+def test_read_state_raises_on_a_non_object_root(tmp_path):
+    import pytest
+
+    from newswatcher.errors import ConfigError
+    p = tmp_path / "state.json"
+    p.write_text("[1, 2, 3]", encoding="utf-8")   # valid JSON, wrong shape
+    with pytest.raises(ConfigError):
+        read_state(p)
+
+
+def test_read_state_raises_on_a_malformed_section(tmp_path):
+    import pytest
+
+    from newswatcher.errors import ConfigError
+    p = tmp_path / "state.json"
+    p.write_text('{"seen_guids_by_source": ["a"]}', encoding="utf-8")   # section is a list, not a map
+    with pytest.raises(ConfigError):
+        read_state(p)
+
+
+def test_read_state_tolerates_a_missing_section(tmp_path):
+    # A missing section is not corruption -- it defaults to empty (a legit partial file).
+    p = tmp_path / "state.json"
+    p.write_text('{"empty_polls_by_source": {"s": 1}}', encoding="utf-8")
+    st = read_state(p)
+    assert st.seen_guids_by_source == {} and st.empty_polls_by_source == {"s": 1}
