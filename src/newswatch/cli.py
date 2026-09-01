@@ -168,8 +168,12 @@ def _poll_once(args: argparse.Namespace) -> int:
         email_to = args.to or config.setting(_DIGEST_TO_ENV)
         push_to = args.push or config.setting(_DIGEST_PUSH_ENV)
         if email_to or push_to:
-            send_digest(group_stories(report.collected), email_to=email_to,
-                        push_to=push_to, heal_notes=heal_notes)
+            for failure in send_digest(group_stories(report.collected), email_to=email_to,
+                                       push_to=push_to, heal_notes=heal_notes):
+                # A partial failure (one channel down, another delivered): report it, but do
+                # not abort -- the watermark still advances, so the delivered channel is not
+                # re-sent. Only an all-channel failure raises and withholds the watermark.
+                print(f"newswatch: {failure}", file=sys.stderr)
         else:
             print("newswatch: no digest destination (set --to / NEWSWATCH_DIGEST_TO for "
                   "email or --push / NEWSWATCH_DIGEST_PUSH for chat); not sending",

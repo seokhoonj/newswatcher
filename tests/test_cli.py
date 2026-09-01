@@ -151,7 +151,7 @@ def test_poll_persists_state_after_successful_mail(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     writes = _poll_returning_one(monkeypatch)
     sent = []
-    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1))
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1) or ())
     assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 0
     assert sent == [1] and writes == [1]
 
@@ -160,7 +160,7 @@ def test_poll_routes_both_email_and_chat_flags_to_the_digest(monkeypatch, tmp_pa
     _xdg(monkeypatch, tmp_path)
     _poll_returning_one(monkeypatch)
     calls: dict[str, object] = {}
-    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: calls.update(k))
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: calls.update(k) or ())
     assert cli.main(["poll", "--no-heal", "--no-store",
                      "--to", "you@example.com", "--push", "alerts"]) == 0
     assert calls["email_to"] == "you@example.com"
@@ -172,7 +172,7 @@ def test_poll_can_send_to_chat_alone(monkeypatch, tmp_path):
     monkeypatch.delenv("NEWSWATCH_DIGEST_TO", raising=False)
     _poll_returning_one(monkeypatch)
     calls: dict[str, object] = {}
-    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: calls.update(k))
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: calls.update(k) or ())
     assert cli.main(["poll", "--no-heal", "--no-store", "--push", "alerts"]) == 0
     assert calls["email_to"] is None and calls["push_to"] == "alerts"
 
@@ -185,7 +185,7 @@ def test_poll_warns_and_sends_nothing_when_no_destination_is_configured(
     monkeypatch.delenv("NEWSWATCH_DIGEST_PUSH", raising=False)
     _poll_returning_one(monkeypatch)
     sent = []
-    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1))
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1) or ())
     assert cli.main(["poll", "--no-heal", "--no-store"]) == 0
     assert sent == []                                       # nothing delivered
     assert "no digest destination" in capsys.readouterr().err

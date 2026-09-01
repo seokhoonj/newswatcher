@@ -53,24 +53,43 @@ def render_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...] = (
 def send_digest(
     stories: tuple[Story, ...], *, email_to: str | None = None, push_to: str | None = None,
     heal_notes: tuple[str, ...] = (), account: str | None = None,
-) -> None:
+) -> tuple[str, ...]:
     """Send the digest of ``stories`` to each destination given: ``email_to`` (a mailmail
     address or address-book alias) via email, ``push_to`` (a pushpush route name) via chat,
     or both. A no-op when there is nothing to report and no heal notes, or when neither
     destination is given -- the caller decides which channels are configured.
 
+    Returns the delivery failures, one message each -- empty when every configured
+    destination accepted the digest. A caller that persists progress only on success can
+    still do so on a *partial* failure, because the channels that did accept the digest
+    must not be re-sent.
+
     Raises:
-        DigestError: a delivery package is missing, or a destination refused or failed the
-            send. Email is attempted before chat; a failure on either raises at once, so a
-            later channel is not reached.
+        DigestError: only when *every* configured destination failed. A caller that re-sends
+            on a raise (having withheld its watermark) then re-sends nothing that already
+            went out; a partial failure is returned, not raised, for the same reason -- the
+            delivered channel would otherwise get the digest twice on the retry.
     """
     if not stories and not heal_notes:
-        return
+        return ()
     subject, body = render_digest(stories, heal_notes=heal_notes)
+    failures: list[str] = []
+    delivered = 0
     if email_to:
-        _send_email(subject, body, to=email_to, account=account)
+        try:
+            _send_email(subject, body, to=email_to, account=account)
+            delivered += 1
+        except DigestError as err:
+            failures.append(str(err))
     if push_to:
-        _send_chat(subject, body, to=push_to)
+        try:
+            _send_chat(subject, body, to=push_to)
+            delivered += 1
+        except DigestError as err:
+            failures.append(str(err))
+    if (email_to or push_to) and not delivered:
+        raise DigestError("; ".join(failures))
+    return tuple(failures)
 
 
 def _send_email(subject: str, body: str, *, to: str, account: str | None) -> None:

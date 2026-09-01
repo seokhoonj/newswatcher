@@ -107,6 +107,51 @@ def test_send_digest_reaches_both_channels_when_both_are_given(monkeypatch):
     assert mailed == ["you@e.com"] and pushed == ["alerts"]
 
 
+def test_send_digest_returns_a_partial_failure_without_raising(monkeypatch):
+    # Email accepts the digest, chat is down: the chat failure comes back as a returned
+    # message, not an exception -- so the caller advances its watermark and does not re-send
+    # the email that already went out.
+    class _Mail:
+        MailmailError = RuntimeError
+
+        def send(self, *, subject, body, to, account=None):
+            pass
+
+    class _Push:
+        PushpushError = RuntimeError
+
+        def send(self, text, *, to, markup="plain"):
+            raise self.PushpushError("route revoked")
+
+    monkeypatch.setattr(digest, "_load_mailmail", lambda: _Mail())
+    monkeypatch.setattr(digest, "_load_pushpush", lambda: _Push())
+    failures = send_digest((_story("a", "t"),), email_to="you@e.com", push_to="alerts")
+    assert len(failures) == 1 and "chat" in failures[0]
+
+
+def test_send_digest_raises_only_when_every_channel_fails(monkeypatch):
+    import pytest
+
+    from newswatch.errors import DigestError
+
+    class _Mail:
+        MailmailError = RuntimeError
+
+        def send(self, *, subject, body, to, account=None):
+            raise self.MailmailError("smtp down")
+
+    class _Push:
+        PushpushError = RuntimeError
+
+        def send(self, text, *, to, markup="plain"):
+            raise self.PushpushError("route revoked")
+
+    monkeypatch.setattr(digest, "_load_mailmail", lambda: _Mail())
+    monkeypatch.setattr(digest, "_load_pushpush", lambda: _Push())
+    with pytest.raises(DigestError):
+        send_digest((_story("a", "t"),), email_to="you@e.com", push_to="alerts")
+
+
 def test_send_digest_is_a_noop_when_nothing_to_report(monkeypatch):
     called = []
     monkeypatch.setattr(digest, "_load_mailmail", lambda: called.append(1))
