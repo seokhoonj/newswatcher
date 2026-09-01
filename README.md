@@ -185,6 +185,3 @@ in `config.toml`.
 A poll takes a single-instance lock, so a scheduled poll and a manual one never run
 at once — whichever starts second logs that a poll is already running and exits. The
 lock uses `flock` on Linux and macOS and `msvcrt` on Windows.
-
-> Note: the Windows scheduler and lock paths are covered by unit tests but have not
-> yet been verified on a real Windows machine.

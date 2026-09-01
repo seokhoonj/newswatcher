@@ -182,6 +182,3 @@ Linux·macOS의 cron은 나눠떨어지는 간격(15/20/30분, 1/2/4/8/12시간,
 poll은 단일 인스턴스 lock을 잡으므로 예약 poll과 수동 poll이 동시에 돌지 않습니다.
 나중에 시작한 쪽은 이미 poll이 실행 중이라고 알리고 종료합니다. lock은 Linux·macOS에서
 `flock`, Windows에서 `msvcrt`를 씁니다.
-
-> 참고: Windows 스케줄러·lock 경로는 단위 테스트로 검증했으나 아직 실제 Windows
-> 머신에서 검증하지 않았습니다.
