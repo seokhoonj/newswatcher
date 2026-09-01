@@ -1,11 +1,15 @@
-"""Register the recurring poll with the user's crontab.
+"""Register the recurring poll with the OS scheduler: crontab on Linux/macOS, schtasks on
+Windows.
 
-newswatch manages exactly one crontab line, tagged with a marker comment, so
-installing or removing it never disturbs the user's other cron jobs. Interval parsing
-accepts plain minutes (``15``), ``Nm``, or ``Nh``."""
+On POSIX, newswatch manages exactly one crontab line tagged with a marker comment, so
+installing or removing it never disturbs the user's other cron jobs. On Windows it manages
+one scheduled task named ``newswatch-poll``. Interval parsing accepts plain minutes
+(``15``), ``Nm``, or ``Nh``; which intervals are expressible differs by backend (see
+``_cron_time_spec`` and ``_win_schedule``)."""
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -18,7 +22,12 @@ __all__ = [
 ]
 
 DEFAULT_INTERVAL_MINUTES = 30
-_MARKER = "# newswatch-poll"
+_MARKER = "# newswatch-poll"      # POSIX crontab marker comment
+_TASK_NAME = "newswatch-poll"     # Windows scheduled-task name (the schtasks marker)
+
+
+def _is_windows() -> bool:
+    return os.name == "nt"
 
 
 def parse_interval(text: str) -> int:
@@ -48,14 +57,19 @@ def resolve_poll_command() -> list[str]:
 
 
 def install_poll(every_minutes: int) -> str:
-    """Install (or replace) the newswatch poll crontab line at ``every_minutes``; return
-    the installed cron line.
+    """Install (or replace) the recurring newswatch poll at ``every_minutes``; return the
+    installed schedule line. Uses crontab on Linux/macOS and schtasks on Windows.
 
     Raises:
-        ScheduleError: the interval is not expressible as a simple cron step, no
-            ``crontab`` command is available, or the crontab could not be read or
-            written.
+        ScheduleError: the interval is not expressible on this platform's scheduler, the
+            scheduler command is unavailable, or the schedule could not be read or written.
     """
+    if _is_windows():
+        return _win_install(every_minutes)
+    return _cron_install(every_minutes)
+
+
+def _cron_install(every_minutes: int) -> str:
     line = f"{_cron_time_spec(every_minutes)} {' '.join(resolve_poll_command())} {_MARKER}"
     lines = [ln for ln in _read_crontab() if _MARKER not in ln]
     lines.append(line)
@@ -98,6 +112,49 @@ def _irregular(every_minutes: int) -> ScheduleError:
         f"interval of {every_minutes} minutes has no regular cron schedule; use a "
         f"sub-hour interval that divides 60 (e.g. 15, 20, 30), a whole number of hours "
         f"that divides 24 (e.g. 60, 120, 240, 480), or one day (1440)")
+
+
+# --- Windows backend (schtasks) -----------------------------------------------
+
+def _win_schedule(every_minutes: int) -> tuple[str, str]:
+    """The schtasks ``(/SC, /MO)`` pair for ``every_minutes``. schtasks has no cron
+    divisor restriction, but its fields still bound it: ``/SC MINUTE`` takes 1-1439 and
+    ``/SC DAILY`` takes a whole number of days.
+
+    Raises:
+        ScheduleError: the interval is under a minute, or over 1439 minutes without being a
+            whole number of days (schtasks cannot express it either).
+    """
+    if every_minutes < 1:
+        raise ScheduleError(f"interval must be at least 1 minute, got {every_minutes}")
+    if every_minutes < 1440:
+        return "MINUTE", str(every_minutes)
+    if every_minutes % 1440 == 0:
+        return "DAILY", str(every_minutes // 1440)
+    raise ScheduleError(
+        f"interval of {every_minutes} minutes has no schtasks schedule; use under 1440 "
+        f"minutes or a whole number of days")
+
+
+def _win_install(every_minutes: int) -> str:
+    sc, mo = _win_schedule(every_minutes)
+    command = subprocess.list2cmdline(resolve_poll_command())   # Windows-safe quoting
+    _schtasks("/Create", "/F", "/TN", _TASK_NAME, "/TR", command, "/SC", sc, "/MO", mo)
+    return f"{_TASK_NAME}: /SC {sc} /MO {mo}"
+
+
+def _schtasks_bin() -> str:
+    found = shutil.which("schtasks")
+    if found is None:
+        raise ScheduleError("no 'schtasks' command on this system; cannot schedule the poll")
+    return found
+
+
+def _schtasks(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run([_schtasks_bin(), *args], capture_output=True, text=True)
+    if check and result.returncode != 0:
+        raise ScheduleError(f"could not run schtasks: {result.stderr.strip()}")
+    return result
 
 
 def remove_poll() -> bool:

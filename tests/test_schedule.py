@@ -130,3 +130,58 @@ def test_status_reports_installed_line(monkeypatch):
     assert poll_status() is None
     line = install_poll(30)
     assert poll_status() == line
+
+
+# --- Windows (schtasks) backend: unit-tested via the _is_windows seam + a fake _schtasks ---
+
+def _fake_schtasks(monkeypatch, calls, *, query_found=False):
+    """Record schtasks arg lists; return a CompletedProcess-like object."""
+    import subprocess
+
+    def fake(*args, check=True):
+        calls.append(list(args))
+        stdout = f"{schedule._TASK_NAME}   Ready\n" if query_found else ""
+        rc = 0 if (query_found or "/Query" not in args) else 1
+        return subprocess.CompletedProcess(args, rc, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(schedule, "_schtasks", fake)
+
+
+def test_windows_install_minute_interval(monkeypatch):
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    calls: list[list[str]] = []
+    _fake_schtasks(monkeypatch, calls)
+    schedule.install_poll(45)   # cron rejects 45; Windows accepts it
+    args = calls[0]
+    assert args[:4] == ["/Create", "/F", "/TN", schedule._TASK_NAME]
+    assert args[args.index("/SC") + 1] == "MINUTE"
+    assert args[args.index("/MO") + 1] == "45"
+
+
+def test_windows_install_daily_interval(monkeypatch):
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    calls: list[list[str]] = []
+    _fake_schtasks(monkeypatch, calls)
+    schedule.install_poll(2880)   # 2 days
+    args = calls[0]
+    assert args[args.index("/SC") + 1] == "DAILY"
+    assert args[args.index("/MO") + 1] == "2"
+
+
+def test_windows_install_rejects_over_cap_non_daily(monkeypatch):
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    _fake_schtasks(monkeypatch, [])
+    with pytest.raises(ScheduleError):
+        schedule.install_poll(1500)   # 25h: over the MINUTE cap, not a whole day
+
+
+def test_windows_install_quotes_the_command(monkeypatch):
+    monkeypatch.setattr(schedule, "_is_windows", lambda: True)
+    monkeypatch.setattr(schedule, "resolve_poll_command",
+                        lambda: [r"C:\Program Files\Py\python.exe", "-m", "newswatch", "poll"])
+    calls: list[list[str]] = []
+    _fake_schtasks(monkeypatch, calls)
+    schedule.install_poll(30)
+    tr = calls[0][calls[0].index("/TR") + 1]
+    assert tr.startswith('"C:\\Program Files\\Py\\python.exe"')   # exe with spaces is quoted
+    assert "newswatch" in tr and "poll" in tr
