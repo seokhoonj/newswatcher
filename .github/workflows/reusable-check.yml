@@ -1,0 +1,82 @@
+name: reusable check
+
+# The full check -- tests, lint, types, and the packaging assertions -- factored into
+# one reusable job so a push / PR check and any release gate that later reuses it run
+# the *identical* thing rather than two copies that drift.
+
+on:
+  workflow_call:
+
+# The floor lives on the shared body so every caller runs the check read-only. A
+# reusable workflow can only downscope from its caller, so this never widens a token.
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor and the current release. requires-python says >=3.11, so 3.11 is the
+        # version that claim has to hold on; the upper end tracks whatever CPython ships.
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Install
+        # A venv per matrix version, not `uv pip --system`: the runner's system Python
+        # is externally managed and is one fixed version whatever the matrix says. This
+        # is also what the README tells a person to run.
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install -e ".[dev]"
+          .venv/bin/python -c "import sys; print('testing on', sys.version)"
+
+      - name: Test
+        run: .venv/bin/pytest -q
+
+      - name: Lint
+        run: .venv/bin/ruff check src tests
+
+      - name: Types
+        run: .venv/bin/mypy
+
+      - name: Confirm the package imports with only its declared dependencies
+        # newswatcher pulls in third-party runtime deps (feedparser, bs4, requests, ...).
+        # Installed into a bare environment with nothing but those declared deps, it must
+        # import and its CLI must run -- so an import the pyproject forgot to declare
+        # fails here rather than in a user's fresh install.
+        run: |
+          uv venv /tmp/bare --python ${{ matrix.python-version }}
+          uv pip install --python /tmp/bare/bin/python .
+          /tmp/bare/bin/python -c "import newswatcher; print('newswatcher', newswatcher.__version__, 'imports')"
+          /tmp/bare/bin/newswatcher --help > /dev/null
+
+      - name: Confirm the console script installed
+        # pyproject declares a `newswatcher` entry point; a wheel that dropped it would
+        # leave the skill and the docs pointing at a command that is not there.
+        run: |
+          uv venv /tmp/cli --python ${{ matrix.python-version }}
+          uv pip install --python /tmp/cli/bin/python .
+          /tmp/cli/bin/newswatcher --version
+
+      - name: Confirm py.typed ships in the built package
+        # The hints are invisible to a user's type checker unless py.typed rides along
+        # (PEP 561), and the source cannot answer whether the wheel kept it: the file can
+        # sit in git while the build omits it. Install the built package and look for it.
+        run: |
+          uv venv /tmp/typed --python ${{ matrix.python-version }}
+          uv pip install --python /tmp/typed/bin/python .
+          /tmp/typed/bin/python -c "
+          import importlib.util, pathlib
+          spec = importlib.util.find_spec('newswatcher')
+          root = pathlib.Path(spec.origin).parent
+          assert (root / 'py.typed').is_file(), 'py.typed missing from the installed package'
+          print('py.typed ships alongside newswatcher')
+          "
