@@ -55,8 +55,9 @@ class LLMError(NewswatchError):
 
 
 class DigestError(NewswatchError):
-    """A digest could not be mailed: the ``mailmail`` package is missing, or it
-    refused or failed the send. Its message carries the underlying cause."""
+    """A digest could not be delivered: a delivery package (``mailmail`` for email,
+    ``pushpush`` for chat) is missing, or a destination refused or failed the send. Its
+    message carries the underlying cause."""
 
 
 class ScheduleError(NewswatchError):

@@ -156,6 +156,41 @@ def test_poll_persists_state_after_successful_mail(monkeypatch, tmp_path):
     assert sent == [1] and writes == [1]
 
 
+def test_poll_routes_both_email_and_chat_flags_to_the_digest(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    _poll_returning_one(monkeypatch)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: calls.update(k))
+    assert cli.main(["poll", "--no-heal", "--no-store",
+                     "--to", "you@example.com", "--push", "alerts"]) == 0
+    assert calls["email_to"] == "you@example.com"
+    assert calls["push_to"] == "alerts"
+
+
+def test_poll_can_send_to_chat_alone(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCH_DIGEST_TO", raising=False)
+    _poll_returning_one(monkeypatch)
+    calls: dict[str, object] = {}
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: calls.update(k))
+    assert cli.main(["poll", "--no-heal", "--no-store", "--push", "alerts"]) == 0
+    assert calls["email_to"] is None and calls["push_to"] == "alerts"
+
+
+def test_poll_warns_and_sends_nothing_when_no_destination_is_configured(
+    monkeypatch, tmp_path, capsys
+):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCH_DIGEST_TO", raising=False)
+    monkeypatch.delenv("NEWSWATCH_DIGEST_PUSH", raising=False)
+    _poll_returning_one(monkeypatch)
+    sent = []
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: sent.append(1))
+    assert cli.main(["poll", "--no-heal", "--no-store"]) == 0
+    assert sent == []                                       # nothing delivered
+    assert "no digest destination" in capsys.readouterr().err
+
+
 def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
     from newswatch.lock import single_instance
     _xdg(monkeypatch, tmp_path)

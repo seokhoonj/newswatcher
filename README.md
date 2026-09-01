@@ -3,9 +3,10 @@
 **한국어** | [English](README.en.md)
 
 newswatch는 RSS 피드와 robots 정책이 허용하는 목록 페이지를 확인하고, 새 기사를
-사용자가 정의한 토픽과 매칭한 뒤 LLM으로 요약하여 토픽별 이메일 다이제스트 한 통을
-보냅니다. 토픽은 직접 정의하므로 같은 도구로 종목, 기술, 정책, 그 밖에 피드가 다루는
-어떤 주제든 추적할 수 있습니다.
+사용자가 정의한 토픽과 매칭한 뒤 LLM으로 요약하여 토픽별 다이제스트 한 통을 이메일이나
+채팅으로 보냅니다. 같은 사건을 여러 매체가 보도하면 한 항목으로 묶습니다. 토픽은 직접
+정의하므로 같은 도구로 종목, 기술, 정책, 그 밖에 피드가 다루는 어떤 주제든 추적할 수
+있습니다.
 
 ## 설치
 
@@ -43,10 +44,24 @@ newswatch poll
 - `add-topic <name> [--include WORD...] [--exclude WORD...]` / `topics` — 토픽 필터를 정의하고 나열합니다.
 - `add-source <name> <url> [--kind rss|crawl] [--topic NAME]... [--keep-all]` / `sources` — 소스를 등록하고 나열합니다. crawl 소스는 selector도 받습니다: `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 모든 기사를 보관합니다.
 - `recent <url> [--limit N]` — 등록 전에 피드의 최신 항목을 저장 없이 미리 봅니다.
-- `poll` / `watch [--every N]` — 수집 → 요약 → 발송을 한 번 수행하거나 주기적으로 포그라운드에서 반복합니다. 둘 다 `--to ADDRESS`(수신자), `--no-mail`, `--no-store`, `--no-heal`, LLM `--provider` / `--model`을 받습니다.
+- `poll` / `watch [--every N]` — 수집 → 요약 → 발송을 한 번 수행하거나 주기적으로 포그라운드에서 반복합니다. 둘 다 `--to ADDRESS`(이메일 수신자), `--push ROUTE`(pushpush 채팅 라우트), `--no-mail`, `--no-store`, `--no-heal`, LLM `--provider` / `--model`을 받습니다.
 - `articles [--topic NAME] [--since DATE] [--until DATE]` — archive된 기사를 나열합니다.
 - `heal [--dry-run] [--provider P] [--model M]` — 매칭이 끊긴 crawl selector를 점검하고 복구합니다.
 - `schedule install|status|remove [--every N]` — 반복 poll을 운영체제 스케줄러에 등록합니다.
+
+## 배달
+
+다이제스트는 이메일, 채팅, 또는 둘 다로 보낼 수 있습니다. 원하는 대상을 하나 이상
+설정합니다.
+
+- 이메일은 mailmail로 보냅니다: `--to ADDRESS` 또는 `NEWSWATCH_DIGEST_TO` 설정
+  (mailmail 주소나 주소록 별칭).
+- 채팅은 pushpush로 보냅니다: `--push ROUTE` 또는 `NEWSWATCH_DIGEST_PUSH` 설정으로,
+  pushpush에 미리 설정해 둔 라우트(텔레그램·슬랙·디스코드)를 지정합니다. 다이제스트는
+  markdown 메시지 한 통으로 전송됩니다.
+
+두 패키지는 newswatch와 함께 설치되므로, `--push`를 쓰기 전에 pushpush 자체 CLI로
+라우트만 설정하면 됩니다.
 
 ## 뉴스 피드
 
@@ -117,7 +132,8 @@ crawl 소스에는 `item`, `title`, `link` selector (HTML에서 원하는 요소
 있으면 link selector에 `css@attribute` 형식을 사용합니다.
 
 비밀이 아닌 설정은 `config.toml`에도 둘 수 있습니다. 환경 변수가 같은 설정 파일
-값보다 우선합니다. 예를 들어 `NEWSWATCH_DIGEST_TO`는 `digest_to`에 대응합니다.
+값보다 우선합니다. 예를 들어 `NEWSWATCH_DIGEST_TO`는 `digest_to`에, `NEWSWATCH_DIGEST_PUSH`는
+`digest_push`에 대응합니다.
 기사 archive (지속적으로 보관하는 기록)와 실행 상태는 XDG data/state 디렉터리를
 사용하며, `NEWSWATCH_DATA_DIR`와 `NEWSWATCH_STATE_DIR`로 위치를 바꿀 수 있습니다.
 

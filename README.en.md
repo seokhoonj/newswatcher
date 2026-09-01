@@ -4,9 +4,10 @@
 
 newswatch watches RSS feeds and robots-permitted listing pages, matches new
 articles against topics you define, summarizes the matches with an LLM, and
-emails one topic-grouped digest. The topics are yours to define, so the same
-tool tracks a stock ticker, a technology, a policy beat, or any subject a feed
-covers.
+sends one topic-grouped digest by email, chat, or both. Several outlets covering
+the same story collapse into a single entry. The topics are yours to define, so
+the same tool tracks a stock ticker, a technology, a policy beat, or any subject
+a feed covers.
 
 ## Install
 
@@ -44,11 +45,24 @@ Run `newswatch --help` or `newswatch <command> --help` for every option;
 - `add-topic <name> [--include WORD...] [--exclude WORD...]` / `topics` — define and list topic filters.
 - `add-source <name> <url> [--kind rss|crawl] [--topic NAME]... [--keep-all]` / `sources` — register and list sources. A crawl source also takes selectors: `--item --title --link` (required) and `--date --body-selector` (optional). `--keep-all` retains every article without keyword filtering.
 - `recent <url> [--limit N]` — preview a feed's latest items without storing, to check it before adding.
-- `poll` / `watch [--every N]` — collect → summarize → mail once, or repeat on an interval in the foreground. Both accept `--to ADDRESS` (digest recipient), `--no-mail`, `--no-store`, `--no-heal`, and the LLM `--provider` / `--model` flags.
+- `poll` / `watch [--every N]` — collect → summarize → send once, or repeat on an interval in the foreground. Both accept `--to ADDRESS` (email recipient), `--push ROUTE` (a pushpush chat route), `--no-mail`, `--no-store`, `--no-heal`, and the LLM `--provider` / `--model` flags.
 - `articles [--topic NAME] [--since DATE] [--until DATE]` — list archived articles.
 - `heal [--dry-run] [--provider P] [--model M]` — check and repair crawl selectors that stopped matching.
 - `schedule install|status|remove [--every N]` — register the recurring poll with the OS
   scheduler.
+
+## Delivery
+
+The digest is sent by email, to a chat channel, or both -- set one or both destinations.
+
+- Email goes through mailmail: `--to ADDRESS` or the `NEWSWATCH_DIGEST_TO` setting (a
+  mailmail address or address-book alias).
+- Chat goes through pushpush: `--push ROUTE` or the `NEWSWATCH_DIGEST_PUSH` setting,
+  naming a route you configured in pushpush (Telegram, Slack, or Discord). The digest is
+  sent as one markdown message.
+
+Both packages are installed with newswatch; configure a pushpush route with pushpush's
+own CLI before using `--push`.
 
 ## News feeds
 
@@ -121,7 +135,8 @@ The `item`, `title`, and `link` selectors are required for crawl sources;
 
 Non-secret settings can also be placed in `config.toml`. Environment variables
 take precedence over corresponding settings there. For example,
-`NEWSWATCH_DIGEST_TO` maps to `digest_to`. The article archive and run state use
+`NEWSWATCH_DIGEST_TO` maps to `digest_to`, and `NEWSWATCH_DIGEST_PUSH` to `digest_push`.
+The article archive and run state use
 the XDG data and state directories; `NEWSWATCH_DATA_DIR` and
 `NEWSWATCH_STATE_DIR` can override them.
 

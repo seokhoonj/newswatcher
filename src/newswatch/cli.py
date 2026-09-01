@@ -41,6 +41,7 @@ from newswatch.topics import Topic, add_topic, load_topics
 __all__ = ["main"]
 
 _DIGEST_TO_ENV = "NEWSWATCH_DIGEST_TO"
+_DIGEST_PUSH_ENV = "NEWSWATCH_DIGEST_PUSH"
 _LLM_PROVIDER_ENV = "NEWSWATCH_LLM_PROVIDER"
 _LLM_MODEL_ENV = "NEWSWATCH_LLM_MODEL"
 
@@ -164,12 +165,15 @@ def _poll_once(args: argparse.Namespace) -> int:
     for name, reason in report.skipped:
         print(f"newswatch: skipping {name}: {reason}", file=sys.stderr)
     if not args.no_mail:
-        to = args.to or config.setting(_DIGEST_TO_ENV)
-        if to:
-            send_digest(group_stories(report.collected), to=to, heal_notes=heal_notes)
+        email_to = args.to or config.setting(_DIGEST_TO_ENV)
+        push_to = args.push or config.setting(_DIGEST_PUSH_ENV)
+        if email_to or push_to:
+            send_digest(group_stories(report.collected), email_to=email_to,
+                        push_to=push_to, heal_notes=heal_notes)
         else:
-            print("newswatch: no digest recipient (set --to or NEWSWATCH_DIGEST_TO); "
-                  "not mailing", file=sys.stderr)
+            print("newswatch: no digest destination (set --to / NEWSWATCH_DIGEST_TO for "
+                  "email or --push / NEWSWATCH_DIGEST_PUSH for chat); not sending",
+                  file=sys.stderr)
     # Persist the watermark only after the digest is out (or mailing was skipped): a
     # send failure then re-collects and re-sends next run rather than losing the digest.
     write_state(state)
@@ -301,9 +305,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _add_poll_flags(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--to", default=None, help="digest recipient (mailmail address or alias)")
+    parser.add_argument("--to", default=None, help="email digest recipient (mailmail address or alias)")
+    parser.add_argument("--push", default=None, metavar="ROUTE",
+                        help="also send the digest to a pushpush chat route")
     parser.add_argument("--no-mail", action="store_true", dest="no_mail",
-                        help="collect and archive but do not send the digest")
+                        help="collect and archive but do not send the digest (email or chat)")
     parser.add_argument("--no-store", action="store_true", dest="no_store",
                         help="do not archive collected articles")
     parser.add_argument("--no-heal", action="store_true", dest="no_heal",

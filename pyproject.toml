@@ -29,6 +29,7 @@ dependencies    = [
     "feedparser>=6.0",
     "lxml>=5.0",
     "mailmail>=0.2",
+    "pushpush>=0.2",
     "requests>=2.31",
     "thinchat>=0.1,<0.2",
     "trafilatura>=1.8",

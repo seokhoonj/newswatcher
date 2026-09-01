@@ -1,11 +1,12 @@
-"""Assemble and send the digest email.
+"""Assemble and send the digest.
 
-One email per poll: the new articles grouped by topic, each entry showing its title,
-our LLM summary, and the source link — never the article's own text. Any selector
-repairs the healer made this run are appended so the change is visible. Delivery is
-mailmail's job (a base dependency); this module only renders the message and hands it
-over, so 'how to send mail' lives in one place. mailmail is imported lazily so
-importing this module does not pull it in until a send happens."""
+One digest per poll: the new stories grouped by topic, each entry showing the lead's
+title, our LLM summary, and the source link — never the article's own text. Any selector
+repairs the healer made this run are appended so the change is visible. This module
+renders the message once and hands it to a delivery package — mailmail for email,
+pushpush for chat, both base dependencies — so 'how to send' lives in one place per
+channel. Each is imported lazily, so importing this module pulls in neither until a send
+on that channel happens."""
 
 from __future__ import annotations
 
@@ -23,6 +24,12 @@ class _MailmailModule(Protocol):
     MailmailError: type[Exception]
 
     def send(self, *, subject: str, body: str, to: str, account: str | None = ...) -> object: ...
+
+
+class _PushpushModule(Protocol):
+    PushpushError: type[Exception]
+
+    def send(self, text: str, *, to: str, markup: str = ...) -> object: ...
 
 
 def render_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...] = ()
@@ -44,25 +51,49 @@ def render_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...] = (
 
 
 def send_digest(
-    stories: tuple[Story, ...], *, to: str, heal_notes: tuple[str, ...] = (),
-    account: str | None = None,
+    stories: tuple[Story, ...], *, email_to: str | None = None, push_to: str | None = None,
+    heal_notes: tuple[str, ...] = (), account: str | None = None,
 ) -> None:
-    """Send the digest of ``stories`` to ``to`` (a mailmail address or address-book
-    alias). A no-op when there is nothing to report and no heal notes.
+    """Send the digest of ``stories`` to each destination given: ``email_to`` (a mailmail
+    address or address-book alias) via email, ``push_to`` (a pushpush route name) via chat,
+    or both. A no-op when there is nothing to report and no heal notes, or when neither
+    destination is given -- the caller decides which channels are configured.
 
     Raises:
-        DigestError: mailmail is missing, or it refused or failed the send.
+        DigestError: a delivery package is missing, or a destination refused or failed the
+            send. Email is attempted before chat; a failure on either raises at once, so a
+            later channel is not reached.
     """
     if not stories and not heal_notes:
         return
     subject, body = render_digest(stories, heal_notes=heal_notes)
+    if email_to:
+        _send_email(subject, body, to=email_to, account=account)
+    if push_to:
+        _send_chat(subject, body, to=push_to)
+
+
+def _send_email(subject: str, body: str, *, to: str, account: str | None) -> None:
     mailmail = _load_mailmail()
     try:
         mailmail.send(subject=subject, body=body, to=to, account=account)
     except mailmail.MailmailError as err:
-        raise DigestError(f"could not send digest: {err}") from err
+        raise DigestError(f"could not send digest email: {err}") from err
     except OSError as err:
-        raise DigestError(f"network error sending digest: {err}") from err
+        raise DigestError(f"network error sending digest email: {err}") from err
+
+
+def _send_chat(subject: str, body: str, *, to: str) -> None:
+    """Deliver to a pushpush route. Chat has no subject line, so the subject leads the text;
+    the body is the same markdown the email carries, so the topic headers render as chat
+    markdown."""
+    pushpush = _load_pushpush()
+    try:
+        pushpush.send(f"{subject}\n\n{body}", to=to, markup="markdown")
+    except pushpush.PushpushError as err:
+        raise DigestError(f"could not send digest to chat: {err}") from err
+    except OSError as err:
+        raise DigestError(f"network error sending digest to chat: {err}") from err
 
 
 def _group_by_topic(stories: tuple[Story, ...]) -> list[tuple[str, list[Story]]]:
@@ -101,3 +132,14 @@ def _load_mailmail() -> _MailmailModule:
             "reinstall newswatch"
         ) from err
     return cast(_MailmailModule, mailmail)
+
+
+def _load_pushpush() -> _PushpushModule:
+    try:
+        import pushpush
+    except ImportError as err:
+        raise DigestError(
+            "the pushpush package is required to send a chat digest but could not be "
+            "imported; reinstall newswatch"
+        ) from err
+    return cast(_PushpushModule, pushpush)

@@ -64,13 +64,52 @@ def test_send_digest_hands_summary_and_link_to_mailmail(monkeypatch):
             sent.update(subject=subject, body=body, to=to)
 
     monkeypatch.setattr(digest, "_load_mailmail", lambda: _Fake())
-    send_digest((_story("보험료 인상", "insurance", summary="요약문"),), to="you@e.com")
+    send_digest((_story("보험료 인상", "insurance", summary="요약문"),), email_to="you@e.com")
     assert sent["to"] == "you@e.com"
     assert "요약문" in sent["body"] and "https://e.com/x" in sent["body"]
+
+
+def test_send_digest_hands_the_digest_to_pushpush_as_markdown(monkeypatch):
+    sent: dict[str, str] = {}
+
+    class _Fake:
+        PushpushError = RuntimeError
+
+        def send(self, text, *, to, markup="plain"):
+            sent.update(text=text, to=to, markup=markup)
+
+    monkeypatch.setattr(digest, "_load_pushpush", lambda: _Fake())
+    send_digest((_story("보험료 인상", "insurance", summary="요약문"),), push_to="alerts")
+    assert sent["to"] == "alerts"
+    assert sent["markup"] == "markdown"          # topic headers render as chat markdown
+    assert "보험료 인상" in sent["text"] and "요약문" in sent["text"]
+
+
+def test_send_digest_reaches_both_channels_when_both_are_given(monkeypatch):
+    mailed: list[str] = []
+    pushed: list[str] = []
+
+    class _Mail:
+        MailmailError = RuntimeError
+
+        def send(self, *, subject, body, to, account=None):
+            mailed.append(to)
+
+    class _Push:
+        PushpushError = RuntimeError
+
+        def send(self, text, *, to, markup="plain"):
+            pushed.append(to)
+
+    monkeypatch.setattr(digest, "_load_mailmail", lambda: _Mail())
+    monkeypatch.setattr(digest, "_load_pushpush", lambda: _Push())
+    send_digest((_story("보험료 인상", "insurance"),), email_to="you@e.com", push_to="alerts")
+    assert mailed == ["you@e.com"] and pushed == ["alerts"]
 
 
 def test_send_digest_is_a_noop_when_nothing_to_report(monkeypatch):
     called = []
     monkeypatch.setattr(digest, "_load_mailmail", lambda: called.append(1))
-    send_digest((), to="you@e.com")
-    assert called == []   # mailmail is never even loaded
+    monkeypatch.setattr(digest, "_load_pushpush", lambda: called.append(1))
+    send_digest((), email_to="you@e.com", push_to="alerts")
+    assert called == []   # neither delivery package is even loaded
