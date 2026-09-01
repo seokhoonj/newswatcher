@@ -185,9 +185,9 @@ export NEWSWATCH_LLM_PROVIDER=openai
 
 모든 피드, 목록 페이지, 기사 요청은 전송 전에 사이트의 robots 정책을 확인하며
 newswatch의 user agent (HTTP 요청에서 프로그램을 식별하는 문자열)를 보냅니다.
-허용되지 않은 URL은 요청하지 않습니다. 지속 archive와 발송 이메일에는 LLM이 작성한
+허용되지 않은 URL은 요청하지 않습니다. 지속 archive와 발송 다이제스트에는 LLM이 작성한
 요약, 원문 링크, 메타데이터만 들어갑니다. 원문 본문은 일시적인 요약 입력으로만 쓰며
-archive하거나 이메일로 보내지 않습니다.
+archive하거나 발송하지 않습니다.
 
 ## 스케줄링
 

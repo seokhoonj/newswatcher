@@ -53,7 +53,7 @@ Run `newswatch --help` or `newswatch <command> --help` for every option;
 
 ## Delivery
 
-The digest is sent by email, to a chat channel, or both -- set one or both destinations.
+The digest is sent by email, to a chat channel, or both — set one or both destinations.
 
 - Email goes through mailmail: `--to ADDRESS` or the `NEWSWATCH_DIGEST_TO` setting (a
   mailmail address or address-book alias).
@@ -190,9 +190,9 @@ export NEWSWATCH_LLM_PROVIDER=openai
 
 Every feed, listing-page, and article request is checked against the site's
 robots policy before it is sent, and newswatch identifies itself with its user
-agent. A disallowed URL is not fetched. The durable archive and outbound email
+agent. A disallowed URL is not fetched. The durable archive and outbound digest
 contain the LLM-written summary, source link, and metadata only. Raw article
-bodies are transient summary input and are neither archived nor emailed.
+bodies are transient summary input and are neither archived nor sent.
 
 ## Scheduling
 
