@@ -12,8 +12,11 @@ from newswatch.schedule import (
 
 
 def _fake_crontab(monkeypatch, initial=()):
-    """Replace the crontab read/write seams with an in-memory list."""
+    """Replace the crontab read/write seams with an in-memory list, and pin the backend to
+    POSIX. Without the pin these cases dispatch to schtasks when the suite runs on Windows
+    -- which both fails the cron assertions and edits the real Task Scheduler."""
     store = {"lines": list(initial)}
+    monkeypatch.setattr(schedule, "_is_windows", lambda: False)
     monkeypatch.setattr(schedule, "_read_crontab", lambda: list(store["lines"]))
     monkeypatch.setattr(schedule, "_write_crontab",
                         lambda lines: store.__setitem__("lines", list(lines)))
