@@ -168,6 +168,19 @@ def test_poll_persists_state_after_successful_mail(monkeypatch, tmp_path):
     assert sent == [1] and writes == [1]
 
 
+def test_poll_persists_watermark_after_a_partial_delivery_failure(monkeypatch, tmp_path, capsys):
+    # One channel delivered, the other failed: send_digest RETURNS the failure (does not
+    # raise), so the watermark still advances -- the delivered channel is not re-sent next run.
+    _xdg(monkeypatch, tmp_path)
+    writes = _poll_returning_one(monkeypatch)
+    monkeypatch.setattr(cli, "send_digest",
+                        lambda *a, **k: ("could not send digest to chat: route down",))
+    assert cli.main(["poll", "--no-heal", "--no-store",
+                     "--to", "you@example.com", "--push", "alerts"]) == 0
+    assert writes == [1]                                    # watermark advanced despite the failure
+    assert "route down" in capsys.readouterr().err
+
+
 def test_poll_routes_both_email_and_chat_flags_to_the_digest(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     _poll_returning_one(monkeypatch)

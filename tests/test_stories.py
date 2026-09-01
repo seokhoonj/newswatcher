@@ -1,3 +1,5 @@
+import math
+
 from newswatch.store import Article
 from newswatch.stories import Story, group_stories, title_similarity
 
@@ -45,6 +47,13 @@ def test_titles_too_short_for_bigrams_compare_by_exact_equality():
     assert title_similarity("AI", "ML") == 0.0
 
 
+def test_titles_that_normalize_to_empty_are_never_similar():
+    # All-punctuation headlines normalize to "" -- no bigrams and no exact-match value, so
+    # two unrelated punctuation-only titles must not collapse into one story.
+    assert title_similarity("!!!", "???") == 0.0
+    assert title_similarity("...", "...") == 0.0
+
+
 # --- group_stories -------------------------------------------------------------
 
 def test_no_articles_yields_no_stories():
@@ -71,14 +80,29 @@ def test_unrelated_articles_stay_separate():
 
 
 def test_greedy_leader_does_not_chain_transitively():
-    # a~b and (loosely) b~c, but a and c are unalike: c compares only to leads, so the
-    # b link must not pull c into a's story.
+    # A REAL transitive chain: a~b and b~c both meet the threshold, but a and c do not.
+    # Greedy leader compares each article only to existing LEADS, so c (unlike b) does not
+    # get pulled into a's story via the b link -- a transitive-clustering impl would wrongly
+    # merge all three. (Asserting the three similarities up front so the chain is explicit.)
     a = _article("금리 인상 우려 확산")
-    b = _article("금리 인상 우려")     # near-duplicate of a -> joins a
-    c = _article("금리 동결 결정")     # shares only 금리 with a -> its own story
+    b = _article("인상 우려 확산 전망")
+    c = _article("우려 확산 전망 발표")
+    assert title_similarity(a.title, b.title) >= 0.5   # a ~ b
+    assert title_similarity(b.title, c.title) >= 0.5   # b ~ c
+    assert title_similarity(a.title, c.title) < 0.5    # a NOT ~ c
     stories = group_stories((a, b, c))
     assert stories[0].lead is a and b in stories[0].duplicates
     assert stories[-1].lead is c and stories[-1].duplicates == ()
+
+
+def test_group_stories_merges_at_the_exact_threshold_and_separates_just_above():
+    # The join test is `>=`, so a pair whose score is exactly the threshold merges, and the
+    # smallest step above it separates. (Score computed, not hardcoded, so it stays true.)
+    a = _article("코스피 3000 돌파")
+    b = _article("코스피, 3000선 돌파")
+    score = title_similarity(a.title, b.title)
+    assert len(group_stories((a, b), threshold=score)) == 1
+    assert len(group_stories((a, b), threshold=math.nextafter(score, 1.0))) == 2
 
 
 def test_lead_order_follows_first_appearance():
