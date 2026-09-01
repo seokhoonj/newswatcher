@@ -1,0 +1,11 @@
+# Normalize line endings: text files are stored as LF in the repository no
+# matter which machine commits. This repo's .git is shared across a Linux box
+# and a Windows box (via Dropbox), so without this the Windows CRLF working
+# tree shows up as whole-file phantom diffs on Linux. Binary files are left
+# untouched by git's own detection.
+#
+# `eol=lf` makes the *working tree* LF too, and it is not tidiness here: Dropbox
+# syncs the checked-out files, not the index, so a CRLF checkout on Windows is
+# what the Linux box then opens. `text=auto` alone left the two boxes disagreeing
+# about every line of every file either had written.
+* text=auto eol=lf
