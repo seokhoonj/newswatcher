@@ -9,9 +9,11 @@ from newswatcher.robots import RobotsGate
 
 
 class _Resp:
-    def __init__(self, status=200, text="body"):
+    def __init__(self, status=200, text="body", is_redirect=False, location=None):
         self.status_code = status
         self.text = text
+        self.is_redirect = is_redirect
+        self.headers = {"Location": location} if location else {}
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -24,7 +26,7 @@ def test_get_refuses_disallowed_url_without_requesting():
     calls = []
 
     class _Session:
-        def get(self, url, timeout=None):
+        def get(self, url, timeout=None, allow_redirects=True):
             calls.append(url)
             return _Resp()
 
@@ -36,7 +38,7 @@ def test_get_refuses_disallowed_url_without_requesting():
 
 def test_get_returns_text_when_allowed():
     class _Session:
-        def get(self, url, timeout=None):
+        def get(self, url, timeout=None, allow_redirects=True):
             return _Resp(200, "hello")
 
     gate = RobotsGate("ua", lambda url: None)   # no robots.txt -> allow
@@ -45,12 +47,59 @@ def test_get_returns_text_when_allowed():
 
 def test_get_raises_on_non_2xx():
     class _Session:
-        def get(self, url, timeout=None):
+        def get(self, url, timeout=None, allow_redirects=True):
             return _Resp(500, "")
 
     gate = RobotsGate("ua", lambda url: None)
     with pytest.raises(FetchError):
         http.get("https://e.com/x", gate, session=cast(requests.Session, _Session()))
+
+
+# --- get() re-gates every redirect hop, not just the first URL ---
+
+def test_get_re_gates_a_redirect_and_refuses_a_disallowed_target():
+    fetched = []
+
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            fetched.append(url)
+            return _Resp(302, is_redirect=True, location="https://e.com/private/x")
+
+    gate = RobotsGate("ua", lambda url: "User-agent: *\nDisallow: /private")
+    with pytest.raises(FetchError):
+        http.get("https://e.com/ok", gate, session=cast(requests.Session, _Session()))
+    assert fetched == ["https://e.com/ok"]   # the disallowed redirect target was never fetched
+
+
+def test_get_follows_an_allowed_redirect_to_the_final_body():
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            if url == "https://e.com/a":
+                return _Resp(301, is_redirect=True, location="https://e.com/b")
+            return _Resp(200, "final")
+
+    gate = RobotsGate("ua", lambda url: None)
+    assert http.get("https://e.com/a", gate, session=cast(requests.Session, _Session())) == "final"
+
+
+def test_get_refuses_a_non_http_scheme_without_requesting():
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            raise AssertionError("must not request a non-http(s) URL")
+
+    gate = RobotsGate("ua", lambda url: None)
+    with pytest.raises(FetchError):
+        http.get("file:///etc/passwd", gate, session=cast(requests.Session, _Session()))
+
+
+def test_get_stops_on_a_redirect_loop():
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            return _Resp(302, is_redirect=True, location="https://e.com/loop")
+
+    gate = RobotsGate("ua", lambda url: None)
+    with pytest.raises(FetchError):
+        http.get("https://e.com/loop", gate, session=cast(requests.Session, _Session()))
 
 
 # --- get() manages the session it creates, and leaves an injected one to its owner ---
@@ -59,7 +108,7 @@ class _RecordingSession:
     def __init__(self):
         self.closed = False
 
-    def get(self, url, timeout=None):
+    def get(self, url, timeout=None, allow_redirects=True):
         return _Resp(200, "ok")
 
     def close(self):
@@ -90,7 +139,7 @@ def test_get_does_not_close_an_injected_session():
 
 def test_get_closes_a_created_session_even_on_request_failure(monkeypatch):
     class _FailingSession(_RecordingSession):
-        def get(self, url, timeout=None):
+        def get(self, url, timeout=None, allow_redirects=True):
             return _Resp(500, "")   # raise_for_status will raise -> FetchError
 
     created = _FailingSession()

@@ -6,6 +6,7 @@ robots rule is enforced in one place rather than at each call site."""
 from __future__ import annotations
 
 import contextlib
+from urllib.parse import urljoin, urlsplit
 
 import requests
 
@@ -15,6 +16,7 @@ from newswatcher.robots import USER_AGENT, RobotsGate
 __all__ = ["new_session", "get", "fetch_robots", "default_gate"]
 
 _TIMEOUT = 20.0
+_MAX_REDIRECTS = 5
 
 # A synthetic robots.txt that forbids everything, returned when robots.txt could not be
 # fetched because the server erred (5xx) or was unreachable. RFC 9309 requires a client
@@ -33,26 +35,50 @@ def new_session() -> requests.Session:
 
 def get(url: str, gate: RobotsGate, *, session: requests.Session | None = None,
         timeout: float = _TIMEOUT) -> str:
-    """Fetch ``url`` as text, first checking the robots gate. A disallowed URL is
-    never requested.
+    """Fetch ``url`` as text, checking the robots gate before every request. Redirects are
+    followed manually so each hop is re-gated and confined to http/https: a URL that
+    301/302s to a Disallow path, another host, or a non-web scheme cannot smuggle a fetch
+    past robots.txt (requests' automatic redirect following checks only the first URL).
 
     Raises:
-        FetchError: robots.txt disallows the URL, or the request failed / returned a
+        FetchError: robots.txt disallows the URL or a redirect hop, a hop leaves
+            http/https, there are too many redirects, or the request failed / returned a
             non-2xx status.
     """
-    if not gate.can_fetch(url):
-        raise FetchError(f"robots.txt disallows fetching {url}")
-    gate.throttle(url)   # honor the host's requested Crawl-delay between fetches
     # Close only a session we created; an injected one belongs to the caller (a poll
     # threads one pooled session through all its fetches).
     manage = contextlib.nullcontext(session) if session is not None else new_session()
     try:
         with manage as http:
-            response = http.get(url, timeout=timeout)
-            response.raise_for_status()
+            response = _fetch_gated(http, url, gate, timeout)
     except requests.RequestException as err:
         raise FetchError(f"could not fetch {url}: {err}") from err
     return response.text
+
+
+def _fetch_gated(http: requests.Session, url: str, gate: RobotsGate,
+                 timeout: float) -> requests.Response:
+    """GET ``url`` following redirects by hand, re-running the gate and scheme check on the
+    original URL and every ``Location``. Returns the final non-redirect response."""
+    for _ in range(_MAX_REDIRECTS + 1):
+        _require_fetchable(url, gate)
+        response = http.get(url, timeout=timeout, allow_redirects=False)
+        if response.is_redirect:   # 3xx with a Location -> re-gate the target, do not follow
+            url = urljoin(url, response.headers["Location"])
+            continue
+        response.raise_for_status()
+        return response
+    raise FetchError(f"too many redirects fetching {url}")
+
+
+def _require_fetchable(url: str, gate: RobotsGate) -> None:
+    """Confine ``url`` to http/https and pass it through the robots gate and the host's
+    Crawl-delay before any request -- applied per hop, not just to the first URL."""
+    if urlsplit(url).scheme not in ("http", "https"):
+        raise FetchError(f"refusing to fetch non-http(s) URL {url}")
+    if not gate.can_fetch(url):
+        raise FetchError(f"robots.txt disallows fetching {url}")
+    gate.throttle(url)   # honor the host's requested Crawl-delay between fetches
 
 
 def fetch_robots(robots_url: str) -> str | None:
