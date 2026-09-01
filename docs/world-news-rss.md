@@ -132,7 +132,7 @@ SOA)는 공개 RSS 를 확인하지 못했다(대체로 회원 대상 발행이�
 
 ## 섹션 피드 넓히기
 
-`범위`가 **섹션**인 매체는 다른 섹션 피드도 각각 소스로 등록해 커버리지를 넓힐 수 있다(패턴은 매체마다 다름):
+전체 통합 피드가 있더라도 섹션 피드를 함께 제공하는 매체는, 관심 섹션을 각각 소스로 등록해 커버리지를 넓힐 수 있다(패턴은 매체마다 다름):
 
 - BBC: `https://feeds.bbci.co.uk/news/<world|business|technology|science_and_environment>/rss.xml`
 - The Guardian: `https://www.theguardian.com/<world|business|technology|science>/rss`
