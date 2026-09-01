@@ -1,7 +1,7 @@
 import pytest
 
-from newswatch.errors import TopicError
-from newswatch.topics import Topic, add_topic, load_topics
+from newswatcher.errors import TopicError
+from newswatcher.topics import Topic, add_topic, load_topics
 
 
 def test_scalar_topic_key_is_rejected(tmp_path):

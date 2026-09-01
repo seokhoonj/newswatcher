@@ -3,9 +3,9 @@ from typing import cast
 import pytest
 import requests
 
-import newswatch.http as http
-from newswatch.errors import FetchError
-from newswatch.robots import RobotsGate
+import newswatcher.http as http
+from newswatcher.errors import FetchError
+from newswatcher.robots import RobotsGate
 
 
 class _Resp:

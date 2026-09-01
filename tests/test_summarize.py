@@ -1,9 +1,9 @@
 import pytest
 from thinchat.errors import ThinchatError
 
-import newswatch.summarize as summarize
-from newswatch.errors import LLMError
-from newswatch.feed import FeedItem
+import newswatcher.summarize as summarize
+from newswatcher.errors import LLMError
+from newswatcher.feed import FeedItem
 
 
 class _FakeClient:

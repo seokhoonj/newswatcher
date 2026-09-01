@@ -2,14 +2,14 @@
 
 영어권 주요 해외 언론사를 카테고리별로 정리한 표(일반 매체 + 보험/금융 전문지).
 `RSS` 열의 ✅ 는 **실제 fetch로 검증된** 피드가 있다는 뜻이고, ❌ 는 검증 시점에 살아있는
-공개 RSS를 확인하지 못했다는 뜻, 🔒 는 **Cloudflare가 newswatch UA에도 403을 줘서 폴할 수
-없다는 뜻**이다(피드는 실존). ✅ 의 URL은 그대로 newswatch `add-source --kind rss` 에 넣을
+공개 RSS를 확인하지 못했다는 뜻, 🔒 는 **Cloudflare가 newswatcher UA에도 403을 줘서 폴할 수
+없다는 뜻**이다(피드는 실존). ✅ 의 URL은 그대로 newswatcher `add-source --kind rss` 에 넣을
 수 있다. 피드는 영어이므로 토픽 키워드도 영어로 맞춘다.
 
 - 검증 일자: 2026-09-01
 - 검증 방법: 각 매체의 공개 RSS 후보 경로를 직접 요청해 feedparser로 파싱, 항목(entry)이
   실제로 채워지는 피드만 ✅ 로 채택. 여러 후보가 있으면 살아있는 것을 골랐다. **최종 판정은
-  newswatch 자체 fetch(식별 UA + robots 게이트)로 했다** — add-source가 실제로 보내는 요청과
+  newswatcher 자체 fetch(식별 UA + robots 게이트)로 했다** — add-source가 실제로 보내는 요청과
   같아서, 가짜 브라우저 UA는 막아도 정직한 봇은 통과시키는 Cloudflare 사이트(Reinsurance
   News, Artemis 등)까지 정확히 판정된다.
 - `항목수` = 검증 시점에 피드가 반환한 기사 개수(살아있음의 신호, 갱신에 따라 달라짐).
@@ -20,8 +20,8 @@
 ## 본문 유료가 요약에 미치는 영향 (읽고 등록할 것)
 
 RSS **피드 자체는 전부 무료**다(공개 XML, 키 불필요). 다만 `본문=유료` 인 매체는
-newswatch가 요약을 위해 기사 본문을 fetch할 때 페이월/티저만 잡혀 **요약이 얕아질 수
-있다** — 이때 newswatch는 기사 전문 대신 피드가 준 짧은 요약으로 자동 대체(fallback)하므로
+newswatcher가 요약을 위해 기사 본문을 fetch할 때 페이월/티저만 잡혀 **요약이 얕아질 수
+있다** — 이때 newswatcher는 기사 전문 대신 피드가 준 짧은 요약으로 자동 대체(fallback)하므로
 동작은 계속되지만 요약 품질은 헤드라인+블러브 수준이 된다. robots 정책이 본문을 막는
 경우도 같은 방식으로 우아하게 대체된다. (Reuters·AP·Bloomberg Terminal 같은 유료 뉴스
 API는 RSS가 아니며 여기 목록과 무관하다.)
@@ -41,7 +41,7 @@ API는 RSS가 아니며 여기 목록과 무관하다.)
 
 Reuters·AP 는 공개 RSS 제공을 중단했다(유료 뉴스 API로 전환). 비공식 서드파티 미러가
 돌아다니지만 안정성·정당성을 보장할 수 없어 등재하지 않는다. 이 두 곳의 기사는 필요하면
-newswatch `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드로 우회할 수 있다.
+newswatcher `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드로 우회할 수 있다.
 
 ## 미국 / 영국 신문·방송
 
@@ -90,9 +90,9 @@ newswatch `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드로 
 
 재보험 핵심인 **Reinsurance News·Artemis 는 ✅** 로 그대로 `add-source --kind rss` 에 넣으면
 된다. 이 두 곳은 Cloudflare 뒤에 있어 데이터센터 IP + 가짜 브라우저 UA에는 403을 주지만,
-newswatch 의 정직한 식별 UA(`newswatch (+https://github.com/seokhoonj/newswatch)`)에는 200
+newswatcher 의 정직한 식별 UA(`newswatcher (+https://github.com/seokhoonj/newswatcher)`)에는 200
 으로 응답한다 — 스푸핑하지 않는 것이 오히려 통과하는 셈이다. 🔒 인 PropertyCasualty360 은
-newswatch UA 에도 403 이라 폴할 수 없다. 계리(actuarial) 전문지(The Actuary, Actuarial Post,
+newswatcher UA 에도 403 이라 폴할 수 없다. 계리(actuarial) 전문지(The Actuary, Actuarial Post,
 SOA)는 공개 RSS 를 확인하지 못했다(대체로 회원 대상 발행이거나 봇 차단) — `--kind crawl`
 어댑터로 붙일 수 있다.
 
@@ -143,10 +143,10 @@ SOA)는 공개 RSS 를 확인하지 못했다(대체로 회원 대상 발행이�
 ## 등록 예시
 
 ```sh
-newswatch add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
-newswatch add-source "BBC" https://feeds.bbci.co.uk/news/world/rss.xml --kind rss --topic markets
+newswatcher add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
+newswatcher add-source "BBC" https://feeds.bbci.co.uk/news/world/rss.xml --kind rss --topic markets
 
-newswatch add-topic insurance --include reinsurance underwriting "catastrophe bond" solvency
-newswatch add-source "Insurance Journal" https://www.insurancejournal.com/feed/ --kind rss --topic insurance
-newswatch add-source "Insurance Business" https://www.insurancebusinessmag.com/us/rss/ --kind rss --topic insurance
+newswatcher add-topic insurance --include reinsurance underwriting "catastrophe bond" solvency
+newswatcher add-source "Insurance Journal" https://www.insurancejournal.com/feed/ --kind rss --topic insurance
+newswatcher add-source "Insurance Business" https://www.insurancebusinessmag.com/us/rss/ --kind rss --topic insurance
 ```

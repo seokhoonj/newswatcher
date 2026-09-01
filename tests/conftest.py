@@ -5,16 +5,16 @@ host's real ``crontab`` / ``schtasks``, and a Windows run of the cron cases -- w
 the crontab seams but not the platform seam -- registered a live scheduled task on the
 developer's machine. The directory fixture closes the same class of hole on the other
 side: ``state_dir()`` falls through the env var to ``config.toml``, so a developer who has
-a real ``~/.config/newswatch/config.toml`` with a ``state_dir`` key would have the lock
+a real ``~/.config/newswatcher/config.toml`` with a ``state_dir`` key would have the lock
 tests take the real ``poll`` lock and silently starve their own scheduled poll.
 """
 
 import pytest
 
-from newswatch import schedule
+from newswatcher import schedule
 
 _DIR_ENV = ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME")
-_DIR_OVERRIDES = ("NEWSWATCH_DATA_DIR", "NEWSWATCH_STATE_DIR")
+_DIR_OVERRIDES = ("NEWSWATCHER_DATA_DIR", "NEWSWATCHER_STATE_DIR")
 
 
 def _forbidden(kind: str):

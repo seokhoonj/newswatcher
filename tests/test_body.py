@@ -1,5 +1,5 @@
-from newswatch.body import extract_body
-from newswatch.sources import Source
+from newswatcher.body import extract_body
+from newswatcher.sources import Source
 
 PAGE = """<html><body><nav>menu</nav>
 <div class="article-body"><p>보험료가 오른다.</p><p>손해율 상승 때문이다.</p></div>

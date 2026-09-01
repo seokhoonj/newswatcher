@@ -1,0 +1,20 @@
+{
+  "name": "newswatcher",
+  "version": "0.1.0",
+  "description": "Watch RSS feeds, match your topics, and deliver an LLM-summarized digest, powered by the newswatcher package",
+  "author": { "name": "seokhoonj", "url": "https://github.com/seokhoonj" },
+  "homepage": "https://github.com/seokhoonj/newswatcher",
+  "repository": "https://github.com/seokhoonj/newswatcher",
+  "license": "MIT",
+  "keywords": ["news", "rss", "digest", "summarize", "llm"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "newswatcher",
+    "shortDescription": "Watch RSS feeds and deliver an LLM-summarized topic digest",
+    "longDescription": "Run a newswatcher poll from a conversation: collect new articles from your configured RSS or crawl sources, match them to the topics you defined, summarize the matches with an LLM, and deliver one topic-grouped digest by email or chat.",
+    "developerName": "seokhoonj",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": ["Run my newswatcher poll"]
+  }
+}

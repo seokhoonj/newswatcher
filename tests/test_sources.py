@@ -1,7 +1,7 @@
 import pytest
 
-from newswatch.errors import SourceError
-from newswatch.sources import Source, add_source, load_sources, update_selectors
+from newswatcher.errors import SourceError
+from newswatcher.sources import Source, add_source, load_sources, update_selectors
 
 
 def test_rss_source_roundtrip(tmp_path):

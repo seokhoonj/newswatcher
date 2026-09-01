@@ -1,7 +1,7 @@
 import math
 
-from newswatch.store import Article
-from newswatch.stories import Story, group_stories, title_similarity
+from newswatcher.store import Article
+from newswatcher.stories import Story, group_stories, title_similarity
 
 
 def _article(title, *, link=None, source="s", topic="t"):

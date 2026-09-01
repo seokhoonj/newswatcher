@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from newswatch import credentials
-from newswatch.errors import ConfigError
+from newswatcher import credentials
+from newswatcher.errors import ConfigError
 
 
 def _write_credentials(tmp_path: Path, payload: dict[str, object] | list[object] | str) -> Path:
-    cfg = tmp_path / "newswatch"
+    cfg = tmp_path / "newswatcher"
     cfg.mkdir(parents=True, exist_ok=True)
     path = cfg / "credentials.json"
     path.write_text(json.dumps(payload) if not isinstance(payload, str) else payload,
@@ -60,7 +60,7 @@ def test_non_json_file_raises(monkeypatch, tmp_path):
 
 def test_non_utf8_file_raises(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatch"
+    cfg = tmp_path / "newswatcher"
     cfg.mkdir(parents=True, exist_ok=True)
     (cfg / "credentials.json").write_bytes(b"\xff\xfe not utf-8 bytes")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)

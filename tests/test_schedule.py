@@ -1,8 +1,8 @@
 import pytest
 
-from newswatch import schedule
-from newswatch.errors import ScheduleError
-from newswatch.schedule import (
+from newswatcher import schedule
+from newswatcher.errors import ScheduleError
+from newswatcher.schedule import (
     DEFAULT_INTERVAL_MINUTES,
     install_poll,
     parse_interval,
@@ -97,7 +97,7 @@ def test_install_rejects_non_divisor_intervals(monkeypatch):
 
 
 def _marker_lines(store):
-    from newswatch.schedule import _MARKER
+    from newswatcher.schedule import _MARKER
     return [ln for ln in store["lines"] if _MARKER in ln]
 
 
@@ -188,13 +188,13 @@ def test_windows_install_rejects_over_cap_non_daily(monkeypatch):
 def test_windows_install_quotes_the_command(monkeypatch):
     monkeypatch.setattr(schedule, "_is_windows", lambda: True)
     monkeypatch.setattr(schedule, "resolve_poll_command",
-                        lambda: [r"C:\Program Files\Py\python.exe", "-m", "newswatch", "poll"])
+                        lambda: [r"C:\Program Files\Py\python.exe", "-m", "newswatcher", "poll"])
     calls: list[list[str]] = []
     _fake_schtasks(monkeypatch, calls)
     schedule.install_poll(30)
     tr = calls[0][calls[0].index("/TR") + 1]
     assert tr.startswith('"C:\\Program Files\\Py\\python.exe"')   # exe with spaces is quoted
-    assert "newswatch" in tr and "poll" in tr
+    assert "newswatcher" in tr and "poll" in tr
 
 
 def test_windows_status_and_remove_when_present(monkeypatch):

@@ -1,8 +1,8 @@
 import pytest
 
-from newswatch.crawl import extract_items, parse_selector
-from newswatch.errors import SourceError
-from newswatch.sources import Source
+from newswatcher.crawl import extract_items, parse_selector
+from newswatcher.errors import SourceError
+from newswatcher.sources import Source
 
 
 def test_extract_missing_selectors_raises_sourceerror():

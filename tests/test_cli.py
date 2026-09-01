@@ -2,13 +2,13 @@ import argparse
 
 import pytest
 
-import newswatch.cli as cli
+import newswatcher.cli as cli
 
 
 def test_watch_clamps_negative_sleep(monkeypatch):
     # When a poll overruns the interval, the next-tick time is already in the past, so
     # the naive (next_tick - now) is negative. time.sleep rejects a negative value with
-    # ValueError -- which, not being a NewswatchError, would crash the watcher.
+    # ValueError -- which, not being a NewswatcherError, would crash the watcher.
     monkeypatch.setattr(cli, "_run_poll", lambda a: 0)
     monkeypatch.setattr(cli, "_resolve_llm_choice", lambda a: ("gemini", None))
     monkeypatch.setattr(cli, "_resolve_dedup_threshold", lambda: 0.5)
@@ -33,7 +33,7 @@ def test_watch_survives_a_transient_poll_error(monkeypatch):
     # A DigestError/LLMError/ConfigError from one poll must not kill the watcher: the
     # resilience design ("re-collect and re-send next run") depends on there being a next
     # run, which watch only has if it stays in the loop.
-    from newswatch.errors import LLMError
+    from newswatcher.errors import LLMError
     calls = []
 
     class _Stop(Exception):
@@ -58,9 +58,9 @@ def test_watch_survives_a_transient_poll_error(monkeypatch):
 def test_heal_continues_past_a_failing_source(monkeypatch, capsys):
     # The package invariant "one bad source must not stop the rest" must hold for the
     # manual heal command too, not just the in-poll healer.
-    from newswatch.errors import FetchError
-    from newswatch.heal import HealResult
-    from newswatch.sources import Source
+    from newswatcher.errors import FetchError
+    from newswatcher.heal import HealResult
+    from newswatcher.sources import Source
 
     srcs = (Source("a", kind="crawl", url="u", item="i", title="t", link="l"),
             Source("b", kind="crawl", url="u", item="i", title="t", link="l"))
@@ -87,8 +87,8 @@ def _xdg(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    monkeypatch.delenv("NEWSWATCH_DATA_DIR", raising=False)
-    monkeypatch.delenv("NEWSWATCH_STATE_DIR", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_DATA_DIR", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_STATE_DIR", raising=False)
 
 
 def test_add_topic_then_list(monkeypatch, tmp_path, capsys):
@@ -125,8 +125,8 @@ def test_unknown_command_exits_nonzero(monkeypatch, tmp_path):
 
 def _poll_returning_one(monkeypatch):
     """Stub the pipeline to return one collected article and record write_state calls."""
-    from newswatch.poll import PollReport
-    from newswatch.store import Article
+    from newswatcher.poll import PollReport
+    from newswatcher.store import Article
     article = Article(guid="g1", title="t", link="https://e.com/1", source_name="s",
                       published="2026-08-15T00:00:00Z", topics=("markets",), summary="x")
     writes = []
@@ -147,7 +147,7 @@ def _stub_send_digest(record: list[int]):
 
 
 def test_poll_does_not_persist_state_when_mail_fails(monkeypatch, tmp_path):
-    from newswatch.errors import DigestError
+    from newswatcher.errors import DigestError
     _xdg(monkeypatch, tmp_path)
     writes = _poll_returning_one(monkeypatch)
 
@@ -194,7 +194,7 @@ def test_poll_routes_both_email_and_chat_flags_to_the_digest(monkeypatch, tmp_pa
 
 def test_poll_can_send_to_chat_alone(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.delenv("NEWSWATCH_DIGEST_TO", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_DIGEST_TO", raising=False)
     _poll_returning_one(monkeypatch)
     calls: dict[str, object] = {}
     monkeypatch.setattr(cli, "send_digest", lambda *a, **k: calls.update(k) or ())
@@ -206,8 +206,8 @@ def test_poll_warns_and_sends_nothing_when_no_destination_is_configured(
     monkeypatch, tmp_path, capsys
 ):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.delenv("NEWSWATCH_DIGEST_TO", raising=False)
-    monkeypatch.delenv("NEWSWATCH_DIGEST_PUSH", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_DIGEST_TO", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_DIGEST_PUSH", raising=False)
     _poll_returning_one(monkeypatch)
     sent: list[int] = []
     monkeypatch.setattr(cli, "send_digest", _stub_send_digest(sent))
@@ -218,7 +218,7 @@ def test_poll_warns_and_sends_nothing_when_no_destination_is_configured(
 
 def test_poll_reads_the_dedup_threshold_from_the_setting(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "0.8")
+    monkeypatch.setenv("NEWSWATCHER_DEDUP_THRESHOLD", "0.8")
     _poll_returning_one(monkeypatch)
     seen: dict[str, float] = {}
     monkeypatch.setattr(cli, "group_stories",
@@ -230,10 +230,10 @@ def test_poll_reads_the_dedup_threshold_from_the_setting(monkeypatch, tmp_path):
 
 def test_poll_rejects_a_nonnumeric_dedup_threshold(monkeypatch, tmp_path, capsys):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "aggressive")
+    monkeypatch.setenv("NEWSWATCHER_DEDUP_THRESHOLD", "aggressive")
     _poll_returning_one(monkeypatch)
     assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
-    assert "NEWSWATCH_DEDUP_THRESHOLD" in capsys.readouterr().err
+    assert "NEWSWATCHER_DEDUP_THRESHOLD" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("bad", ["-1", "2.0", "nan", "inf", "-inf"])
@@ -241,17 +241,17 @@ def test_poll_rejects_an_out_of_range_or_nonfinite_dedup_threshold(
     monkeypatch, tmp_path, capsys, bad
 ):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", bad)
+    monkeypatch.setenv("NEWSWATCHER_DEDUP_THRESHOLD", bad)
     _poll_returning_one(monkeypatch)
     assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
-    assert "NEWSWATCH_DEDUP_THRESHOLD" in capsys.readouterr().err
+    assert "NEWSWATCHER_DEDUP_THRESHOLD" in capsys.readouterr().err
 
 
 def test_poll_validates_the_dedup_threshold_before_spending_the_llm(monkeypatch, tmp_path):
     # A malformed threshold must fail before poll_sources runs (which pays the LLM to
     # summarize), not after -- else every watch tick re-spends before re-failing.
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "nonsense")
+    monkeypatch.setenv("NEWSWATCHER_DEDUP_THRESHOLD", "nonsense")
     spent = []
     monkeypatch.setattr(cli, "poll_sources", lambda *a, **k: spent.append(1))
     monkeypatch.setattr(cli, "read_state", lambda *a, **k: object())
@@ -263,7 +263,7 @@ def test_watch_ends_instead_of_looping_on_a_permanent_config_error(monkeypatch, 
     # A permanent bad threshold must end the watch (exit 1), not loop forever re-failing
     # while never delivering: the pre-flight resolution raises before the loop body runs.
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.setenv("NEWSWATCH_DEDUP_THRESHOLD", "nonsense")
+    monkeypatch.setenv("NEWSWATCHER_DEDUP_THRESHOLD", "nonsense")
     ran = []
     monkeypatch.setattr(cli, "_run_poll", lambda a: ran.append(1))
     assert cli.main(["watch"]) == 1
@@ -271,7 +271,7 @@ def test_watch_ends_instead_of_looping_on_a_permanent_config_error(monkeypatch, 
 
 
 def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
-    from newswatch.lock import single_instance
+    from newswatcher.lock import single_instance
     _xdg(monkeypatch, tmp_path)
     ran = []
 
@@ -290,8 +290,8 @@ def _capture_provider(monkeypatch):
     """Run poll with the LLM calls stubbed, recording the provider and model the CLI
     actually binds into the summarizer it hands to the pipeline (tested by invoking that
     summarizer, not by inspecting how it was bound)."""
-    from newswatch.poll import PollReport
-    from newswatch.summarize import Summary
+    from newswatcher.poll import PollReport
+    from newswatcher.summarize import Summary
     captured = {}
 
     def fake_summarize(item, body, *, provider, model, api_key=None):
@@ -310,7 +310,7 @@ def _capture_provider(monkeypatch):
 
 def test_poll_binds_provider_and_model_from_flags(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_LLM_PROVIDER", raising=False)
     captured = _capture_provider(monkeypatch)
     assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store",
                      "--provider", "openai", "--model", "gpt-x"]) == 0
@@ -319,7 +319,7 @@ def test_poll_binds_provider_and_model_from_flags(monkeypatch, tmp_path):
 
 def test_poll_provider_comes_from_environment_variable(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.setenv("NEWSWATCH_LLM_PROVIDER", "claude")
+    monkeypatch.setenv("NEWSWATCHER_LLM_PROVIDER", "claude")
     captured = _capture_provider(monkeypatch)
     assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
     assert captured["provider"] == "claude"
@@ -327,8 +327,8 @@ def test_poll_provider_comes_from_environment_variable(monkeypatch, tmp_path):
 
 def test_poll_model_comes_from_setting(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
-    monkeypatch.setenv("NEWSWATCH_LLM_MODEL", "configured-model")
+    monkeypatch.delenv("NEWSWATCHER_LLM_PROVIDER", raising=False)
+    monkeypatch.setenv("NEWSWATCHER_LLM_MODEL", "configured-model")
     captured = _capture_provider(monkeypatch)
     assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
     assert captured["model"] == "configured-model"
@@ -336,7 +336,7 @@ def test_poll_model_comes_from_setting(monkeypatch, tmp_path):
 
 def test_poll_empty_provider_flag_falls_through_to_setting(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.setenv("NEWSWATCH_LLM_PROVIDER", "claude")
+    monkeypatch.setenv("NEWSWATCHER_LLM_PROVIDER", "claude")
     captured = _capture_provider(monkeypatch)
     assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store", "--provider", ""]) == 0
     assert captured["provider"] == "claude"
@@ -344,18 +344,18 @@ def test_poll_empty_provider_flag_falls_through_to_setting(monkeypatch, tmp_path
 
 def test_poll_defaults_to_gemini(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
-    monkeypatch.delenv("NEWSWATCH_LLM_MODEL", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_LLM_MODEL", raising=False)
     captured = _capture_provider(monkeypatch)
     assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
-    from newswatch._llm import DEFAULT_PROVIDER
+    from newswatcher._llm import DEFAULT_PROVIDER
     assert captured["provider"] == DEFAULT_PROVIDER
     assert captured["model"] is None
 
 
 def test_poll_unknown_provider_is_rejected(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_LLM_PROVIDER", raising=False)
     # a typo'd provider fails fast with a one-line error, even with nothing to summarize
     assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store",
                      "--provider", "gemninni"]) == 1
@@ -363,8 +363,8 @@ def test_poll_unknown_provider_is_rejected(monkeypatch, tmp_path):
 
 def test_heal_threads_provider_to_heal_source(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
-    monkeypatch.delenv("NEWSWATCH_LLM_PROVIDER", raising=False)
-    from newswatch.sources import Source
+    monkeypatch.delenv("NEWSWATCHER_LLM_PROVIDER", raising=False)
+    from newswatcher.sources import Source
     captured = {}
 
     def fake_heal_source(source, *, gate, apply, provider, model, **kwargs):
@@ -386,7 +386,7 @@ def test_heal_threads_provider_to_heal_source(monkeypatch, tmp_path):
 def _fake_cron(monkeypatch, initial=()):
     """Pin the POSIX backend and give it an in-memory crontab, so these exercise the real
     _run_schedule and the real install/remove/status rather than a stubbed CLI."""
-    from newswatch import schedule
+    from newswatcher import schedule
     store = {"lines": list(initial)}
     monkeypatch.setattr(schedule, "_is_windows", lambda: False)
     monkeypatch.setattr(schedule, "_read_crontab", lambda: list(store["lines"]))
@@ -402,7 +402,7 @@ def test_schedule_install_uses_the_given_interval(monkeypatch, capsys):
 
 
 def test_schedule_install_defaults_the_interval(monkeypatch, capsys):
-    from newswatch.schedule import DEFAULT_INTERVAL_MINUTES
+    from newswatcher.schedule import DEFAULT_INTERVAL_MINUTES
     _fake_cron(monkeypatch)
     assert cli.main(["schedule", "install"]) == 0
     assert f"*/{DEFAULT_INTERVAL_MINUTES} * * * * " in capsys.readouterr().out

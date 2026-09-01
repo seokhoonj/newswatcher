@@ -1,7 +1,7 @@
-from newswatch.feed import FeedItem
-from newswatch.match import assign_topics, matches_topic, topics_for
-from newswatch.sources import Source
-from newswatch.topics import Topic
+from newswatcher.feed import FeedItem
+from newswatcher.match import assign_topics, matches_topic, topics_for
+from newswatcher.sources import Source
+from newswatcher.topics import Topic
 
 INS = Topic("insurance", includes=("보험", "손보"), excludes=("광고",))
 

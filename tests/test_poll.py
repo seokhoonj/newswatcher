@@ -1,12 +1,12 @@
-from newswatch.errors import ArchiveError, FetchError, LLMError
-from newswatch.feed import FeedItem
-from newswatch.poll import poll_sources
-from newswatch.robots import RobotsGate
-from newswatch.sources import Source
-from newswatch.state import State
-from newswatch.store import FileStore
-from newswatch.summarize import Summary
-from newswatch.topics import Topic
+from newswatcher.errors import ArchiveError, FetchError, LLMError
+from newswatcher.feed import FeedItem
+from newswatcher.poll import poll_sources
+from newswatcher.robots import RobotsGate
+from newswatcher.sources import Source
+from newswatcher.state import State
+from newswatcher.store import FileStore
+from newswatcher.summarize import Summary
+from newswatcher.topics import Topic
 
 
 class _Collect:
@@ -21,11 +21,11 @@ def _fake_summary(item, body, **k):
 
 
 # Unused by these tests: _collect/_fetch_body are stubbed, so the gate is never read.
-_gate = RobotsGate("newswatch-test", lambda url: None)
+_gate = RobotsGate("newswatcher-test", lambda url: None)
 
 
 def test_poll_collects_matched_new_articles(tmp_path, monkeypatch):
-    import newswatch.poll as poll
+    import newswatcher.poll as poll
     src = Source("범용지", kind="rss", url="u", topics=("insurance",))
     items = (FeedItem(title="보험료 인상", link="https://e.com/1", guid="g1",
                       published="2026-08-15T00:00:00Z", source_name="범용지"),
@@ -43,7 +43,7 @@ def test_poll_collects_matched_new_articles(tmp_path, monkeypatch):
 
 
 def test_second_poll_skips_seen(tmp_path, monkeypatch):
-    import newswatch.poll as poll
+    import newswatcher.poll as poll
     src = Source("전문지", kind="rss", url="u", topics=("insurance",), keep_all=True)
     items = (FeedItem(title="a", link="https://e.com/1", guid="g1",
                       published="2026-08-15T00:00:00Z", source_name="전문지"),)
@@ -59,7 +59,7 @@ def test_second_poll_skips_seen(tmp_path, monkeypatch):
 
 
 def test_poll_degrades_on_summary_error(tmp_path, monkeypatch):
-    import newswatch.poll as poll
+    import newswatcher.poll as poll
     src = Source("지", kind="rss", url="u", topics=("t",), keep_all=True)
     items = (FeedItem(title="a", link="https://e.com/1", guid="g1",
                       published="2026-08-15T00:00:00Z", source_name="지"),
@@ -85,7 +85,7 @@ def test_poll_degrades_on_summary_error(tmp_path, monkeypatch):
 
 
 def test_poll_degrades_on_store_error(tmp_path, monkeypatch):
-    import newswatch.poll as poll
+    import newswatcher.poll as poll
     src = Source("지", kind="rss", url="u", topics=("t",), keep_all=True)
     items = (FeedItem(title="a", link="https://e.com/1", guid="g1",
                       published="2026-08-15T00:00:00Z", source_name="지"),)
@@ -105,7 +105,7 @@ def test_poll_degrades_on_store_error(tmp_path, monkeypatch):
 
 
 def test_poll_skips_a_failed_source_and_collects_a_later_one(tmp_path, monkeypatch):
-    import newswatch.poll as poll
+    import newswatcher.poll as poll
     bad = Source("깨진소스", kind="rss", url="u", topics=("t",), keep_all=True)
     good = Source("정상소스", kind="rss", url="u", topics=("t",), keep_all=True)
     items = (FeedItem(title="a", link="https://e.com/1", guid="g1",
@@ -125,7 +125,7 @@ def test_poll_skips_a_failed_source_and_collects_a_later_one(tmp_path, monkeypat
 
 
 def test_empty_crawl_source_is_reported(tmp_path, monkeypatch):
-    import newswatch.poll as poll
+    import newswatcher.poll as poll
     src = Source("무RSS", kind="crawl", url="u", topics=("insurance",),
                  item="li", title="a", link="a@href")
     monkeypatch.setattr(poll, "_collect", lambda s, g, sess: ())

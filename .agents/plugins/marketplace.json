@@ -1,10 +1,10 @@
 {
-  "name": "newswatch",
-  "interface": { "displayName": "newswatch" },
+  "name": "newswatcher",
+  "interface": { "displayName": "newswatcher" },
   "plugins": [
     {
-      "name": "newswatch",
-      "source": { "source": "local", "path": "./plugins/newswatch" },
+      "name": "newswatcher",
+      "source": { "source": "local", "path": "./plugins/newswatcher" },
       "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
       "category": "Productivity"
     }

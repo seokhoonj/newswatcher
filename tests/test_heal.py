@@ -1,13 +1,13 @@
 import pytest
 from thinchat.errors import ThinchatError
 
-import newswatch.heal as heal
-from newswatch.errors import HealError
-from newswatch.robots import RobotsGate
-from newswatch.sources import Source, add_source, load_sources
-from newswatch.state import State
+import newswatcher.heal as heal
+from newswatcher.errors import HealError
+from newswatcher.robots import RobotsGate
+from newswatcher.sources import Source, add_source, load_sources
+from newswatcher.state import State
 
-_GATE = RobotsGate("newswatch-test", lambda url: None)   # heal_source is stubbed, gate unused
+_GATE = RobotsGate("newswatcher-test", lambda url: None)   # heal_source is stubbed, gate unused
 
 
 def test_heal_error_hides_key(monkeypatch):

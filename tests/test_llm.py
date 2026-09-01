@@ -1,8 +1,8 @@
 import pytest
 from thinchat.errors import ThinchatError
 
-import newswatch._llm as _llm
-from newswatch.errors import LLMError
+import newswatcher._llm as _llm
+from newswatcher.errors import LLMError
 
 
 def test_scrub_secrets_redacts_resolvable_key(monkeypatch, tmp_path):
@@ -72,7 +72,7 @@ def test_scrub_exception_scrubs_the_whole_cause_chain(monkeypatch, tmp_path):
 
 def test_make_llm_client_uses_credentials_file(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatch"
+    cfg = tmp_path / "newswatcher"
     cfg.mkdir(parents=True)
     (cfg / "credentials.json").write_text('{"GEMINI_API_KEY": "file-key"}', encoding="utf-8")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -92,7 +92,7 @@ def test_make_llm_client_uses_credentials_file(monkeypatch, tmp_path):
 
 def test_make_llm_client_explicit_key_wins_over_file(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatch"
+    cfg = tmp_path / "newswatcher"
     cfg.mkdir(parents=True)
     (cfg / "credentials.json").write_text('{"GEMINI_API_KEY": "file-key"}', encoding="utf-8")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
@@ -108,7 +108,7 @@ def test_make_llm_client_explicit_key_wins_over_file(monkeypatch, tmp_path):
 
 def test_make_llm_client_env_key_wins_over_file(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatch"
+    cfg = tmp_path / "newswatcher"
     cfg.mkdir(parents=True)
     (cfg / "credentials.json").write_text('{"GEMINI_API_KEY": "file-key"}', encoding="utf-8")
     monkeypatch.setenv("GEMINI_API_KEY", "env-key")

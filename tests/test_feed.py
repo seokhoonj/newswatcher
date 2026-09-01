@@ -1,4 +1,4 @@
-from newswatch.feed import FeedItem, normalize_date, parse_feed
+from newswatcher.feed import FeedItem, normalize_date, parse_feed
 
 
 def test_normalize_date_iso_and_rfc822_to_utc():
@@ -10,7 +10,7 @@ def test_normalize_date_iso_and_rfc822_to_utc():
 
 
 def test_normalize_date_dotted_and_slash_forms():
-    # The dotted/slash numeric stamps Korean news sites emit -- newswatch's target locale.
+    # The dotted/slash numeric stamps Korean news sites emit -- newswatcher's target locale.
     assert normalize_date("2026.08.15") == "2026-08-15T00:00:00Z"
     assert normalize_date("2026.08.15 09:00") == "2026-08-15T09:00:00Z"
     assert normalize_date("2026/08/15 09:00:00") == "2026-08-15T09:00:00Z"

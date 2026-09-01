@@ -1,9 +1,9 @@
-from newswatch.lock import single_instance
+from newswatcher.lock import single_instance
 
 
 def _state_home(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
-    monkeypatch.delenv("NEWSWATCH_STATE_DIR", raising=False)
+    monkeypatch.delenv("NEWSWATCHER_STATE_DIR", raising=False)
 
 
 def test_single_instance_acquires_when_free(monkeypatch, tmp_path):
@@ -41,7 +41,7 @@ class _FakeMsvcrt:
 
 
 def test_windows_lock_acquires_and_refuses_then_releases(monkeypatch, tmp_path):
-    import newswatch.lock as lock
+    import newswatcher.lock as lock
     _state_home(monkeypatch, tmp_path)
     monkeypatch.setattr(lock, "_is_windows", lambda: True)
     monkeypatch.setattr(lock, "msvcrt", _FakeMsvcrt())
@@ -54,7 +54,7 @@ def test_windows_lock_acquires_and_refuses_then_releases(monkeypatch, tmp_path):
 
 
 def test_no_backend_degrades_to_always_acquire(monkeypatch, tmp_path):
-    import newswatch.lock as lock
+    import newswatcher.lock as lock
     _state_home(monkeypatch, tmp_path)
     monkeypatch.setattr(lock, "_is_windows", lambda: False)
     monkeypatch.setattr(lock, "fcntl", None)

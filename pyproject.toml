@@ -3,7 +3,7 @@ requires      = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name            = "newswatch"
+name            = "newswatcher"
 version         = "0.1.0"
 description     = "Collect topic-matched articles from RSS and robots-permitted crawl sources, summarize them, and mail a digest."
 readme          = "README.md"
@@ -36,9 +36,9 @@ dependencies    = [
 ]
 
 [project.urls]
-Homepage   = "https://github.com/seokhoonj/newswatch"
-Repository = "https://github.com/seokhoonj/newswatch"
-Issues     = "https://github.com/seokhoonj/newswatch/issues"
+Homepage   = "https://github.com/seokhoonj/newswatcher"
+Repository = "https://github.com/seokhoonj/newswatcher"
+Issues     = "https://github.com/seokhoonj/newswatcher/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -49,10 +49,10 @@ dev = [
 ]
 
 [project.scripts]
-newswatch = "newswatch.cli:main"
+newswatcher = "newswatcher.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/newswatch"]
+packages = ["src/newswatcher"]
 
 [tool.ruff]
 line-length    = 100
@@ -83,5 +83,5 @@ ignore_missing_imports = true
 # the host's own (fcntl vs msvcrt; ctypes.windll). Both branches therefore need an ignore
 # and one of them is always unused, so type-checking on either OS means not warning here.
 [[tool.mypy.overrides]]
-module = ["newswatch.lock", "newswatch.schedule"]
+module = ["newswatcher.lock", "newswatcher.schedule"]
 warn_unused_ignores = false

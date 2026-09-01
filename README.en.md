@@ -1,8 +1,8 @@
-# newswatch
+# newswatcher
 
 [한국어](README.md) | **English**
 
-newswatch watches RSS feeds and robots-permitted listing pages, matches new
+newswatcher watches RSS feeds and robots-permitted listing pages, matches new
 articles against topics you define, summarizes the matches with an LLM, and
 sends one topic-grouped digest by email, chat, or both. Several outlets covering
 the same story collapse into a single entry. The topics are yours to define, so
@@ -11,10 +11,10 @@ a feed covers.
 
 ## Install
 
-newswatch requires Python 3.11 or newer.
+newswatcher requires Python 3.11 or newer.
 
 ```sh
-pip install newswatch
+pip install newswatcher
 ```
 
 ## Quickstart
@@ -23,24 +23,24 @@ Define a topic, register an RSS source, provide a digest recipient and the API
 key for the default Gemini LLM provider, then run one poll:
 
 ```sh
-newswatch add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
-newswatch add-source korea-herald https://www.koreaherald.com/rss/newsAll \
+newswatcher add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
+newswatcher add-source korea-herald https://www.koreaherald.com/rss/newsAll \
   --kind rss --topic markets
-export NEWSWATCH_DIGEST_TO=you@example.com
+export NEWSWATCHER_DIGEST_TO=you@example.com
 export GEMINI_API_KEY=your-api-key
-newswatch poll
+newswatcher poll
 ```
 
 A topic matches on the feed's own language, so pair the keywords with the feed:
 English keywords for an English feed, Korean keywords for a Korean feed.
 
-Use `newswatch topics` and `newswatch sources` to inspect the registries. Run
-`newswatch --help` or `newswatch <command> --help` for all commands and options.
+Use `newswatcher topics` and `newswatcher sources` to inspect the registries. Run
+`newswatcher --help` or `newswatcher <command> --help` for all commands and options.
 
 ## Commands
 
-Run `newswatch --help` or `newswatch <command> --help` for every option;
-`newswatch --version` prints the version.
+Run `newswatcher --help` or `newswatcher <command> --help` for every option;
+`newswatcher --version` prints the version.
 
 - `add-topic <name> [--include WORD...] [--exclude WORD...]` / `topics` — define and list topic filters.
 - `add-source <name> <url> [--kind rss|crawl] [--topic NAME]... [--keep-all]` / `sources` — register and list sources. A crawl source also takes selectors: `--item --title --link` (required) and `--date --body-selector` (optional). `--keep-all` retains every article without keyword filtering.
@@ -55,13 +55,13 @@ Run `newswatch --help` or `newswatch <command> --help` for every option;
 
 The digest is sent by email, to a chat channel, or both — set one or both destinations.
 
-- Email goes through mailmail: `--to ADDRESS` or the `NEWSWATCH_DIGEST_TO` setting (a
+- Email goes through mailmail: `--to ADDRESS` or the `NEWSWATCHER_DIGEST_TO` setting (a
   mailmail address or address-book alias).
-- Chat goes through pushpush: `--push ROUTE` or the `NEWSWATCH_DIGEST_PUSH` setting,
+- Chat goes through pushpush: `--push ROUTE` or the `NEWSWATCHER_DIGEST_PUSH` setting,
   naming a route you configured in pushpush (Telegram, Slack, or Discord). The digest is
   sent as one markdown message.
 
-Both packages are installed with newswatch; configure a pushpush route with pushpush's
+Both packages are installed with newswatcher; configure a pushpush route with pushpush's
 own CLI before using `--push`.
 
 ## News feeds
@@ -103,8 +103,8 @@ topic keywords.
 
 ## Configuration files
 
-newswatch stores hand-edited configuration under
-`$XDG_CONFIG_HOME/newswatch`, or `~/.config/newswatch` when
+newswatcher stores hand-edited configuration under
+`$XDG_CONFIG_HOME/newswatcher`, or `~/.config/newswatcher` when
 `XDG_CONFIG_HOME` is unset. The CLI writes the same files, so CLI and manual
 configuration can be mixed.
 
@@ -152,12 +152,12 @@ The `item`, `title`, and `link` selectors are required for crawl sources;
 
 Non-secret settings can also be placed in `config.toml`. Environment variables
 take precedence over corresponding settings there. For example,
-`NEWSWATCH_DIGEST_TO` maps to `digest_to`, and `NEWSWATCH_DIGEST_PUSH` to `digest_push`.
-`NEWSWATCH_DEDUP_THRESHOLD` (`dedup_threshold`, 0.0–1.0, default 0.5) sets how alike two
+`NEWSWATCHER_DIGEST_TO` maps to `digest_to`, and `NEWSWATCHER_DIGEST_PUSH` to `digest_push`.
+`NEWSWATCHER_DEDUP_THRESHOLD` (`dedup_threshold`, 0.0–1.0, default 0.5) sets how alike two
 headlines must be to collapse as one story — raise it to merge less, lower it to merge
 more. The article archive and run state use
-the XDG data and state directories; `NEWSWATCH_DATA_DIR` and
-`NEWSWATCH_STATE_DIR` can override them.
+the XDG data and state directories; `NEWSWATCHER_DATA_DIR` and
+`NEWSWATCHER_STATE_DIR` can override them.
 
 ## Provider keys and model
 
@@ -176,20 +176,20 @@ provider's standard environment-variable name:
 Each key is also read from that same environment variable, which takes precedence,
 so a one-off run can supply a key without editing the file.
 
-newswatch summarizes with Gemini's free tier by default. Choose another provider,
+newswatcher summarizes with Gemini's free tier by default. Choose another provider,
 and optionally a specific model, with `--provider` / `--model`, or persistently
-with the `NEWSWATCH_LLM_PROVIDER` / `NEWSWATCH_LLM_MODEL` settings (`llm_provider`
+with the `NEWSWATCHER_LLM_PROVIDER` / `NEWSWATCHER_LLM_MODEL` settings (`llm_provider`
 and `llm_model` in `config.toml`):
 
 ```sh
-newswatch poll --provider claude --model claude-sonnet-5
-export NEWSWATCH_LLM_PROVIDER=openai
+newswatcher poll --provider claude --model claude-sonnet-5
+export NEWSWATCHER_LLM_PROVIDER=openai
 ```
 
 ## Responsible collection
 
 Every feed, listing-page, and article request is checked against the site's
-robots policy before it is sent, and newswatch identifies itself with its user
+robots policy before it is sent, and newswatcher identifies itself with its user
 agent. A disallowed URL is not fetched. The durable archive and outbound digest
 contain the LLM-written summary, source link, and metadata only. Raw article
 bodies are transient summary input and are neither archived nor sent.
@@ -199,16 +199,16 @@ bodies are transient summary input and are neither archived nor sent.
 Install a recurring poll every 30 minutes:
 
 ```sh
-newswatch schedule install
+newswatcher schedule install
 ```
 
 Choose another interval with minutes, `Nm`, or `Nh`, and inspect or remove the
 job as needed:
 
 ```sh
-newswatch schedule install --every 2h
-newswatch schedule status
-newswatch schedule remove
+newswatcher schedule install --every 2h
+newswatcher schedule status
+newswatcher schedule remove
 ```
 
 Scheduling uses `crontab` on Linux and macOS and `schtasks` on Windows. On Windows
@@ -223,7 +223,7 @@ On Windows the task is registered under the installing user and runs in their
 interactive session, so it does not fire while nobody is signed in — a locked screen is
 fine, a machine sitting at the sign-in screen is not. It also inherits the Task Scheduler
 default of not starting on battery power. Check it with
-`schtasks /Query /TN newswatch-poll`. On Linux and macOS the cron job has neither
+`schtasks /Query /TN newswatcher-poll`. On Linux and macOS the cron job has neither
 restriction.
 
 A poll takes a single-instance lock, so a scheduled poll and a manual one never run
@@ -232,7 +232,7 @@ lock uses `flock` on Linux and macOS and `msvcrt` on Windows.
 
 ## Use it from an AI coding agent
 
-This repo ships a `poll` skill: ask in plain words ("run my newswatch poll", "check the
+This repo ships a `poll` skill: ask in plain words ("run my newswatcher poll", "check the
 news") and it runs one poll and relays what it found.
 
 ### Claude Code
@@ -240,21 +240,21 @@ news") and it runs one poll and relays what it found.
 In the Claude Code chat, add the marketplace and install:
 
 ```
-/plugin marketplace add seokhoonj/newswatch
-/plugin install newswatch@newswatch
+/plugin marketplace add seokhoonj/newswatcher
+/plugin install newswatcher@newswatcher
 ```
 
-Then invoke it with `/newswatch:poll`, or just ask in plain language. The skill calls the
-`newswatch` command, so install the package too (`pip install newswatch`). See
-`plugins/newswatch/skills/poll/SKILL.md`.
+Then invoke it with `/newswatcher:poll`, or just ask in plain language. The skill calls the
+`newswatcher` command, so install the package too (`pip install newswatcher`). See
+`plugins/newswatcher/skills/poll/SKILL.md`.
 
 ### Codex
 
 In your terminal, add the marketplace and install:
 
 ```
-codex plugin marketplace add seokhoonj/newswatch
-codex plugin add newswatch@newswatch
+codex plugin marketplace add seokhoonj/newswatcher
+codex plugin add newswatcher@newswatcher
 ```
 
 The `poll` skill responds automatically to matching requests.
@@ -264,8 +264,8 @@ The `poll` skill responds automatically to matching requests.
 Symlink the skill into your skills directory and call it as `/poll`:
 
 ```sh
-ln -s "$PWD/plugins/newswatch/skills/poll" ~/.claude/skills/poll   # Claude Code -> /poll
-ln -s "$PWD/plugins/newswatch/skills/poll" ~/.codex/skills/poll    # Codex -> $newswatch:poll
+ln -s "$PWD/plugins/newswatcher/skills/poll" ~/.claude/skills/poll   # Claude Code -> /poll
+ln -s "$PWD/plugins/newswatcher/skills/poll" ~/.codex/skills/poll    # Codex -> $newswatcher:poll
 ```
 
 Claude Code picks it up immediately; Codex needs a restart to load it.

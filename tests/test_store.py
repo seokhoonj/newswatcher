@@ -3,8 +3,8 @@ from datetime import datetime
 
 import pytest
 
-from newswatch.errors import ArchiveError
-from newswatch.store import Article, FileStore
+from newswatcher.errors import ArchiveError
+from newswatcher.store import Article, FileStore
 
 
 def _article(guid, published, topics=("insurance",), title="t"):
@@ -49,7 +49,7 @@ def test_load_date_range_is_half_open(tmp_path):
 
 
 def test_load_falls_back_to_saved_at_when_published_empty(tmp_path, monkeypatch):
-    import newswatch.store as store_mod
+    import newswatcher.store as store_mod
 
     class _FixedDatetime:
         @classmethod
@@ -96,7 +96,7 @@ def test_load_skips_a_forward_schema_version(tmp_path):
                 "article": {}}
     (tmp_path / "articles" / "future.json").write_text(json.dumps(envelope),
                                                        encoding="utf-8")
-    # A file written by a newer newswatch is read as absent, like a corrupt file, so
+    # A file written by a newer newswatcher is read as absent, like a corrupt file, so
     # one forward-schema file does not sink the whole archive read.
     assert [a.guid for a in store.load()] == ["a1"]
 

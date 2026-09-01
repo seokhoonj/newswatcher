@@ -1,13 +1,13 @@
 {
-  "name": "newswatch",
+  "name": "newswatcher",
   "owner": {
     "name": "seokhoonj"
   },
   "plugins": [
     {
-      "name": "newswatch",
-      "source": "./plugins/newswatch",
-      "description": "Run a newswatch poll from a Claude Code conversation: collect new articles from your feeds, summarize them with an LLM, and deliver the topic digest by email or chat. Calls the newswatch package's CLI."
+      "name": "newswatcher",
+      "source": "./plugins/newswatcher",
+      "description": "Run a newswatcher poll from a Claude Code conversation: collect new articles from your feeds, summarize them with an LLM, and deliver the topic digest by email or chat. Calls the newswatcher package's CLI."
     }
   ]
 }

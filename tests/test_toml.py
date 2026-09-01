@@ -1,6 +1,6 @@
 import pytest
 
-from newswatch import _toml
+from newswatcher import _toml
 
 
 class _Err(Exception):

@@ -1,7 +1,7 @@
-import newswatch.digest as digest
-from newswatch.digest import render_digest, send_digest
-from newswatch.store import Article
-from newswatch.stories import Story
+import newswatcher.digest as digest
+from newswatcher.digest import render_digest, send_digest
+from newswatcher.store import Article
+from newswatcher.stories import Story
 
 
 def _article(title, topic, link="https://e.com/x", summary="요약문", source="s"):
@@ -132,7 +132,7 @@ def test_send_digest_returns_a_partial_failure_without_raising(monkeypatch):
 def test_send_digest_raises_only_when_every_channel_fails(monkeypatch):
     import pytest
 
-    from newswatch.errors import DigestError
+    from newswatcher.errors import DigestError
 
     class _Mail:
         MailmailError = RuntimeError

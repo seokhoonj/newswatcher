@@ -1,5 +1,5 @@
-from newswatch.feed import FeedItem
-from newswatch.state import _SEEN_CAP, State, read_state, write_state
+from newswatcher.feed import FeedItem
+from newswatcher.state import _SEEN_CAP, State, read_state, write_state
 
 
 def _item(guid, published=""):

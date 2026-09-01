@@ -2,7 +2,7 @@
 
 국내 언론사를 카테고리별로 최대한 망라한 표. `RSS` 열의 ✅ 는 **실제 fetch로 검증된**
 피드가 있다는 뜻이고, ❌ 는 검증 시점에 살아있는 공개 RSS를 확인하지 못했다는 뜻이다.
-✅ 의 URL은 그대로 newswatch `add-source --kind rss` 에 넣을 수 있다.
+✅ 의 URL은 그대로 newswatcher `add-source --kind rss` 에 넣을 수 있다.
 
 - 검증 일자: 2026-08-20
 - 검증 방법: 각 언론사의 홈페이지 / RSS 인덱스 페이지에서 피드 링크를 자동 탐색하고,
@@ -255,12 +255,12 @@
 JS 렌더링 SPA라 피드 링크를 정적으로 노출하지 않음, (4) RSS 제공 중단이다. 특히 (3)에 걸린
 곳(중앙일보, 한국일보, KBS, MBC, YTN, 대형 지역지 상당수)은 실제로는 RSS가 있어도 이
 자동 검증으로는 못 잡은 것일 수 있으니, 정확한 피드 경로가 확인되면 해당 행을 ✅ 로 갱신하면
-된다. RSS가 정말 없는 곳은 newswatch의 `--kind crawl`(CSS 셀렉터 크롤) 어댑터로 붙일 수 있다.
+된다. RSS가 정말 없는 곳은 newswatcher의 `--kind crawl`(CSS 셀렉터 크롤) 어댑터로 붙일 수 있다.
 
 ## 등록 예시
 
 ```sh
-newswatch add-source "연합뉴스" https://www.yna.co.kr/rss/news.xml --kind rss
-newswatch add-source "조선일보" "https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml" --kind rss
-newswatch add-source "한국보험신문" https://www.insnews.co.kr/rss/allArticle.xml --kind rss --topic insurance
+newswatcher add-source "연합뉴스" https://www.yna.co.kr/rss/news.xml --kind rss
+newswatcher add-source "조선일보" "https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml" --kind rss
+newswatcher add-source "한국보험신문" https://www.insnews.co.kr/rss/allArticle.xml --kind rss --topic insurance
 ```
