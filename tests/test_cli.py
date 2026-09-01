@@ -433,3 +433,17 @@ def test_schedule_install_rejects_a_bad_interval(monkeypatch, capsys):
     _fake_cron(monkeypatch)
     assert cli.main(["schedule", "install", "--every", "soon"]) == 2
     assert "interval must be minutes" in capsys.readouterr().err
+
+
+def test_watch_ends_on_a_corrupt_state_file(monkeypatch, tmp_path):
+    # A corrupt state file is permanent-at-startup; the pre-flight read_state must end the
+    # watch (exit 1) rather than let the loop spin on the ConfigError every tick.
+    _xdg(monkeypatch, tmp_path)
+    from newswatcher.state import state_path
+    p = state_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("{ not valid json", encoding="utf-8")
+    ran = []
+    monkeypatch.setattr(cli, "_run_poll", lambda a: ran.append(1))
+    assert cli.main(["watch"]) == 1
+    assert ran == []   # ended before the loop body ever ran

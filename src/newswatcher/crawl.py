@@ -40,8 +40,12 @@ def crawl_items(source: Source, gate: RobotsGate, *,
 def extract_items(html: str, source: Source) -> tuple[FeedItem, ...]:
     """Extract items from listing ``html`` using ``source``'s selectors. A row whose
     link resolves empty is skipped (nothing to fetch or dedup on). Relative links are
-    resolved against the source URL. Never raises on selector misses — a zero-row
-    result is the healer's trigger, not an error here."""
+    resolved against the source URL. A selector *miss* (zero matching rows) never raises —
+    it is the healer's trigger, not an error — but a *malformed* selector does.
+
+    Raises:
+        SourceError: the source is missing its item/title/link selectors, or one of its
+            selectors is not a valid CSS selector."""
     if not (source.item and source.title and source.link):
         # add_source/_source_from validate this, but Source() itself does not, and an
         # assert would vanish under python -O -- raise the domain error unconditionally.

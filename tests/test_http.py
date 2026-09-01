@@ -206,3 +206,69 @@ def test_declared_charset_is_left_alone():
     r = _R()
     http._fix_charsetless_encoding(cast(requests.Response, r))
     assert r.encoding == "euc-kr"   # a declared charset is trusted
+
+
+# --- redirect + charset hardening (pin the behavior through the public get()) ---
+
+def test_get_disables_automatic_redirect_following():
+    seen = {}
+
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            seen["allow_redirects"] = allow_redirects
+            return _Resp(200, "ok")
+
+    gate = RobotsGate("ua", lambda url: None)
+    http.get("https://e.com/x", gate, session=cast(requests.Session, _Session()))
+    assert seen["allow_redirects"] is False   # manual per-hop gating requires auto-follow OFF
+
+
+def test_get_rejects_a_redirect_without_a_location():
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            return _Resp(302, is_redirect=False)   # 3xx status but no Location header
+
+    gate = RobotsGate("ua", lambda url: None)
+    with pytest.raises(FetchError):
+        http.get("https://e.com/x", gate, session=cast(requests.Session, _Session()))
+
+
+def test_get_re_gates_a_cross_host_redirect_by_the_targets_own_robots():
+    fetched = []
+
+    def robots(url):
+        return "User-agent: *\nDisallow: /" if "b.com" in url else None   # b.com forbids all
+
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            fetched.append(url)
+            return _Resp(302, is_redirect=True, location="https://b.com/x")
+
+    gate = RobotsGate("ua", robots)
+    with pytest.raises(FetchError):
+        http.get("https://a.com/ok", gate, session=cast(requests.Session, _Session()))
+    assert fetched == ["https://a.com/ok"]   # the cross-host target was gated before any fetch
+
+
+def test_get_applies_apparent_encoding_through_the_public_path():
+    class _R:
+        status_code = 200
+        is_redirect = False
+        headers = {"Content-Type": "text/html"}   # no charset
+        encoding = "ISO-8859-1"
+        apparent_encoding = "utf-8"
+
+        def raise_for_status(self):
+            pass
+
+        @property
+        def text(self):
+            return f"decoded-as-{self.encoding}"
+
+    class _Session:
+        def get(self, url, timeout=None, allow_redirects=True):
+            return _R()
+
+    gate = RobotsGate("ua", lambda url: None)
+    out = http.get("https://e.com/x", gate, session=cast(requests.Session, _Session()))
+    assert out == "decoded-as-utf-8"   # get() reset encoding to apparent_encoding before .text

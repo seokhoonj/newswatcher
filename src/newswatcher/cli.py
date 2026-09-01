@@ -217,8 +217,11 @@ def _run_watch(args: argparse.Namespace) -> int:
     # threshold is permanent within the process (settings load once at startup; the
     # environment cannot change mid-run), so letting it raise here ends the watch with a
     # clear error instead of looping forever on the same failure while never delivering.
+    # read_state is pre-flighted too so a corrupt state file fails fast at startup rather
+    # than spinning the loop (the file is re-read each tick, so a mid-run fix still recovers).
     _resolve_llm_choice(args)
     _resolve_dedup_threshold()
+    read_state()
     print(f"watching every {every} min; Ctrl-C to stop", file=sys.stderr)
     next_tick = time.monotonic()
     while True:

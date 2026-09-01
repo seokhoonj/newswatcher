@@ -78,6 +78,10 @@ def _fetch_gated(http: requests.Session, url: str, gate: RobotsGate,
         if response.is_redirect:   # 3xx with a Location -> re-gate the target, do not follow
             url = urljoin(url, response.headers["Location"])
             continue
+        if 300 <= response.status_code < 400:
+            # a redirect status with no Location -- raise_for_status ignores 3xx, so guard it
+            # here rather than hand the interstitial stub body to the summarizer
+            raise FetchError(f"redirect without a Location fetching {url}")
         response.raise_for_status()
         return response
     raise FetchError(f"too many redirects fetching {url}")

@@ -63,6 +63,13 @@ def test_install_daily(monkeypatch):
     assert install_poll(1440).startswith("0 0 */1 * * ")
 
 
+def test_cron_line_does_not_over_quote_a_space_free_command(monkeypatch):
+    _fake_crontab(monkeypatch)
+    monkeypatch.setattr(schedule, "resolve_poll_command",
+                        lambda: ["/usr/bin/python3", "-m", "newswatcher", "poll"])
+    assert "/usr/bin/python3 -m newswatcher poll" in install_poll(30)   # no needless quotes
+
+
 def test_cron_line_quotes_a_command_path_with_spaces(monkeypatch):
     _fake_crontab(monkeypatch)
     monkeypatch.setattr(schedule, "resolve_poll_command",
