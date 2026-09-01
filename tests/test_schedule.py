@@ -1,3 +1,5 @@
+import subprocess
+
 import pytest
 
 from newswatcher import schedule
@@ -327,18 +329,16 @@ def test_codepage_is_zero_off_windows(monkeypatch):
 
 
 def test_run_converts_subprocess_launch_failure_to_scheduleerror(monkeypatch):
-    def boom(*a, **k):
+    def boom(*args, **kwargs):
         raise OSError("exec failed")
     monkeypatch.setattr("newswatcher.schedule.subprocess.run", boom)
     with pytest.raises(ScheduleError):
-        schedule._run(["crontab", "-l"])
+        schedule._run_scheduler_command(["crontab", "-l"])
 
 
 def test_run_converts_timeout_to_scheduleerror(monkeypatch):
-    import subprocess as _sp
-
-    def hang(*a, **k):
-        raise _sp.TimeoutExpired(cmd="crontab", timeout=1)
+    def hang(*args, **kwargs):
+        raise subprocess.TimeoutExpired(cmd="crontab", timeout=1)
     monkeypatch.setattr("newswatcher.schedule.subprocess.run", hang)
     with pytest.raises(ScheduleError):
-        schedule._run(["crontab", "-l"])
+        schedule._run_scheduler_command(["crontab", "-l"])

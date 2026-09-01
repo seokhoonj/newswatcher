@@ -142,13 +142,33 @@ def test_make_llm_client_missing_key_raises(monkeypatch, tmp_path):
 
 
 def test_scrub_exception_redacts_a_url_attribute():
-    from newswatcher._llm import scrub_exception
-
     class _Transport(Exception):
         url: str
 
     e = _Transport("call failed")
     e.url = "https://generativelanguage.googleapis.com/v1?key=SECRET-KEY-123"
-    scrub_exception(e, extra_key="SECRET-KEY-123")
+    _llm.scrub_exception(e, extra_key="SECRET-KEY-123")
     scrubbed = e.url
     assert "SECRET-KEY-123" not in scrubbed and "***" in scrubbed
+
+
+def test_scrub_exception_survives_a_raising_url_property():
+    # httpx spells .request / .url as properties that raise (not return None) when unset;
+    # a cause-chain link like that must not turn the scrubber -- which runs on the error
+    # path -- into a crash that masks the error it was cleaning.
+    class _RaisingTransport(Exception):
+        @property
+        def request(self):
+            raise RuntimeError("the .request property has not been set")
+
+        @property
+        def url(self):
+            raise RuntimeError("the .url property has not been set")
+
+    top = LLMError("provider call failed")
+    try:
+        raise _RaisingTransport("transport failed")
+    except _RaisingTransport as cause:
+        top.__cause__ = cause
+    # Must return the original error rather than propagating the property's RuntimeError.
+    assert _llm.scrub_exception(top, extra_key="SECRET-KEY-123") is top

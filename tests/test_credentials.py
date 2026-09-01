@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -85,14 +86,9 @@ def test_non_string_value_is_no_secret(monkeypatch, tmp_path, value):
 
 
 def test_warns_once_when_credentials_file_is_group_readable(tmp_path, capsys):
-    import os
-
-    import pytest
-
-    from newswatcher import credentials
     if os.name != "posix":
         pytest.skip("POSIX permission bits only")
-    credentials._warned_permissive.clear()
+    credentials._warned_permissive_paths.clear()
     p = tmp_path / "credentials.json"
     p.write_text("{}", encoding="utf-8")
     os.chmod(p, 0o644)
@@ -103,14 +99,9 @@ def test_warns_once_when_credentials_file_is_group_readable(tmp_path, capsys):
 
 
 def test_no_warning_when_credentials_file_is_0600(tmp_path, capsys):
-    import os
-
-    import pytest
-
-    from newswatcher import credentials
     if os.name != "posix":
         pytest.skip("POSIX permission bits only")
-    credentials._warned_permissive.clear()
+    credentials._warned_permissive_paths.clear()
     p = tmp_path / "credentials.json"
     p.write_text("{}", encoding="utf-8")
     os.chmod(p, 0o600)

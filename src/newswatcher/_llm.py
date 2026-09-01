@@ -87,16 +87,28 @@ def scrub_exception(err: BaseException, *, extra_key: str | None = None) -> Base
             node.args = tuple(
                 scrub_secrets(a, extra_key=extra_key) if isinstance(a, str) else a
                 for a in node.args)
-        # A transport error (requests) carries the fetched URL -- and thus a query-string key
-        # -- on the exception and on its .request/.response; scrub those too, best-effort.
-        holders: list[Any] = [node, getattr(node, "request", None), getattr(node, "response", None)]
-        for holder in holders:
-            raw_url = getattr(holder, "url", None)
-            if isinstance(raw_url, str):
-                try:
-                    holder.url = scrub_secrets(raw_url, extra_key=extra_key)
-                except (AttributeError, TypeError):
-                    pass   # a read-only url property -- args/message are still redacted
+        # A transport error carries the fetched URL -- and thus a query-string key -- on the
+        # exception and on its .request/.response; scrub those too, best-effort. Every access
+        # is wrapped: httpx (anthropic/openai backends) spells .request and .url as properties
+        # that *raise* RuntimeError when unset, not return None, and this scrubber runs on the
+        # error path -- if it raised it would mask the very error it was cleaning.
+        url_holders: list[Any] = [node]
+        for attr in ("request", "response"):
+            try:
+                url_holders.append(getattr(node, attr, None))
+            except Exception:
+                url_holders.append(None)
+        for holder in url_holders:
+            try:
+                raw_url = getattr(holder, "url", None)
+            except Exception:
+                continue   # a url property that raises when unset -- nothing to scrub here
+            if not isinstance(raw_url, str):
+                continue
+            try:
+                holder.url = scrub_secrets(raw_url, extra_key=extra_key)
+            except Exception:
+                pass   # a read-only or raising url property -- args/message are still redacted
         node = node.__cause__ or node.__context__
     return err
 

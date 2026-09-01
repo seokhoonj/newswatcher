@@ -30,7 +30,7 @@ from newswatcher.errors import ConfigError
 
 __all__ = ["credentials_path", "secret"]
 
-_warned_permissive: set[str] = set()
+_warned_permissive_paths: set[str] = set()
 
 
 def credentials_path() -> Path:
@@ -89,13 +89,13 @@ def _warn_if_group_or_world_readable(path: Path) -> None:
     """Warn once (POSIX only) when the credentials file is readable by group or others -- a
     secret file should be mode 0600. Best-effort: a stat failure is ignored (the read that
     called this already succeeded), and Windows POSIX bits do not apply."""
-    if os.name != "posix" or str(path) in _warned_permissive:
+    if os.name != "posix" or str(path) in _warned_permissive_paths:
         return
     try:
         mode = path.stat().st_mode
     except OSError:
         return
     if mode & 0o077:
-        _warned_permissive.add(str(path))
+        _warned_permissive_paths.add(str(path))
         print(f"newswatcher: warning: {path} is readable by group/other; "
               f"restrict it with 'chmod 600'", file=sys.stderr)
