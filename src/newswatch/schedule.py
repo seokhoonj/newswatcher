@@ -154,35 +154,62 @@ def _schtasks_bin() -> str:
     return found
 
 
-def _console_codepage() -> int:
-    """The Windows console output codepage, or 0 when there is no console to ask."""
+def _kernel32_codepage(func_name: str) -> int:
+    """Call a kernel32 codepage getter, or 0 off Windows."""
     try:
-        return int(ctypes.windll.kernel32.GetConsoleOutputCP())   # type: ignore[attr-defined]
-    except (AttributeError, OSError, ValueError):
-        return 0   # not Windows, or no console attached (a scheduled task, a GUI parent)
+        return int(getattr(ctypes.windll.kernel32, func_name)())   # type: ignore[attr-defined]
+    except AttributeError:
+        return 0   # ctypes.windll exists only on Windows
+
+
+def _console_codepage() -> int:
+    """The console output codepage. 0 when the process has no console to ask -- a
+    scheduled task or a GUI parent has none, and the call reports that by returning 0
+    rather than by raising."""
+    return _kernel32_codepage("GetConsoleOutputCP")
+
+
+def _oem_codepage() -> int:
+    """The OEM codepage, which is what a console tool started by a console-less parent
+    writes in: Windows gives such a child a freshly allocated console at the OEM default."""
+    return _kernel32_codepage("GetOEMCP")
+
+
+def _codec_for(codepage: int) -> str | None:
+    """The Python codec name for a Windows codepage, or None for 0 or a codepage Python
+    has no codec for (708, 1361, 54936 and friends)."""
+    if not codepage:
+        return None
+    name = "utf-8" if codepage == 65001 else f"cp{codepage}"
+    try:
+        codecs.lookup(name)
+    except LookupError:
+        return None
+    return name
 
 
 def _console_encoding() -> str:
     """The encoding schtasks writes in. A console tool emits text in the *console output*
     codepage, which need not be Python's locale encoding: on a Korean-locale machine whose
     console is UTF-8 (``chcp 65001``), decoding as cp949 raises inside subprocess's reader
-    thread, which drops the output entirely and leaves ``stdout`` None. Ask the OS instead,
-    and fall back to the locale encoding when there is no console or no such codec."""
-    codepage = _console_codepage()
-    if codepage:
-        name = "utf-8" if codepage == 65001 else f"cp{codepage}"
-        try:
-            codecs.lookup(name)
-        except LookupError:
-            pass
-        else:
+    thread, which drops the output entirely and leaves ``stdout`` None.
+
+    Ask the OS in the order the child actually follows: this process's console if it has
+    one, else the OEM codepage its fresh console will get. Only if neither answers does
+    this fall back to Python's locale encoding, which is the ANSI codepage -- a different
+    axis, and one that UTF-8 mode redefines without changing what schtasks emits."""
+    for codepage in (_console_codepage(), _oem_codepage()):
+        name = _codec_for(codepage)
+        if name is not None:
             return name
     return locale.getpreferredencoding(False)
 
 
 def _schtasks(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    # errors="replace" so an unexpected byte degrades one character rather than losing the
-    # whole run; everything read back from schtasks (the task name, the exit code) is ASCII.
+    # errors="replace" so a codepage the OS misreported degrades a character rather than
+    # losing the whole run. What newswatch *parses* is ASCII -- the exit code, and the XML
+    # element names below -- but the trailing columns and stderr are localized, so a wrong
+    # codepage still shows the user mojibake instead of their own language.
     result = subprocess.run([_schtasks_bin(), *args], capture_output=True,
                             encoding=_console_encoding(), errors="replace")
     if check and result.returncode != 0:
@@ -251,8 +278,6 @@ def _win_schedule_from_xml(xml: str) -> str:
     if days:
         return f"/SC DAILY /MO {days.group(1)}"
     return "on a schedule newswatch did not set"   # hand-edited in Task Scheduler
-
-
 
 
 def _win_remove() -> bool:

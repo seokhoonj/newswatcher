@@ -245,6 +245,29 @@ def test_windows_remove_when_absent(monkeypatch):
 
 # --- schtasks output decoding: the console codepage is not the locale encoding -----------
 
+def test_schtasks_decodes_with_the_console_encoding(monkeypatch):
+    """The fix is a pair of kwargs on the subprocess call, and every other Windows case
+    fakes _schtasks itself -- one level above this body. Without this test the encoding
+    could be dropped and the whole suite would stay green while `schedule status` died on
+    a console whose codepage differs from the locale's."""
+    import subprocess as real_subprocess
+    seen: dict[str, object] = {}
+
+    class _Recorder:
+        @staticmethod
+        def run(argv, **kwargs):
+            seen.update(kwargs)
+            return real_subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(schedule, "_schtasks_bin", lambda: "schtasks.exe")
+    monkeypatch.setattr(schedule, "subprocess", _Recorder)
+    schedule._schtasks("/Query")
+    assert seen["encoding"] == schedule._console_encoding()
+    assert seen["errors"] == "replace"
+    assert "text" not in seen   # text=True is what decoded with the locale encoding
+
+
+
 def test_console_encoding_prefers_the_console_codepage(monkeypatch):
     monkeypatch.setattr(schedule, "_console_codepage", lambda: 949)
     assert schedule._console_encoding() == "cp949"
@@ -257,20 +280,32 @@ def test_console_encoding_maps_utf8_codepage(monkeypatch):
     assert schedule._console_encoding() == "utf-8"
 
 
-def test_console_encoding_falls_back_without_a_console(monkeypatch):
+def test_console_encoding_uses_the_oem_codepage_without_a_console(monkeypatch):
+    # A console-less parent's console-app child gets a fresh console at the OEM codepage.
+    # The locale encoding is the ANSI one -- a different axis, and UTF-8 mode redefines it
+    # without changing a byte of what schtasks emits.
+    monkeypatch.setattr(schedule, "_console_codepage", lambda: 0)
+    monkeypatch.setattr(schedule, "_oem_codepage", lambda: 437)
+    assert schedule._console_encoding() == "cp437"
+
+
+def test_console_encoding_falls_back_when_neither_answers(monkeypatch):
     import locale
     monkeypatch.setattr(schedule, "_console_codepage", lambda: 0)
+    monkeypatch.setattr(schedule, "_oem_codepage", lambda: 0)
     assert schedule._console_encoding() == locale.getpreferredencoding(False)
 
 
 def test_console_encoding_falls_back_on_unknown_codepage(monkeypatch):
     import locale
-    monkeypatch.setattr(schedule, "_console_codepage", lambda: 99999)
+    monkeypatch.setattr(schedule, "_console_codepage", lambda: 99999)   # no Python codec
+    monkeypatch.setattr(schedule, "_oem_codepage", lambda: 0)
     assert schedule._console_encoding() == locale.getpreferredencoding(False)
 
 
-def test_console_codepage_is_zero_off_windows(monkeypatch):
+def test_codepage_is_zero_off_windows(monkeypatch):
     # ctypes.windll exists only on Windows; asking elsewhere must degrade, not raise.
     import ctypes
     monkeypatch.delattr(ctypes, "windll", raising=False)
     assert schedule._console_codepage() == 0
+    assert schedule._oem_codepage() == 0
