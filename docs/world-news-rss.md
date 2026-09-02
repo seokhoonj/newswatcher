@@ -86,7 +86,9 @@ newswatcher `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드�
 | Coverager | ✅ | https://coverager.com/feed/ | 전체 | 10 | 무료 |
 | Digital Insurance | ✅ | https://www.dig-in.com/feed?rss=true | 전체 | 10 | 유료 |
 | PropertyCasualty360 | 🔒 | https://www.propertycasualty360.com/feed/ | 전체 | — | 유료 |
-| Intelligent Insurer / The Insurer / Insurance Insider | ❌ | — | — | — | — |
+| Intelligent Insurer | ❌ | — | — | — | — |
+| The Insurer | ❌ | — | — | — | — |
+| Insurance Insider | ❌ | — | — | — | — |
 
 재보험 핵심인 **Reinsurance News·Artemis 는 ✅** 로 그대로 `add-source --kind rss` 에 넣으면
 된다. 이 두 곳은 Cloudflare 뒤에 있어 데이터센터 IP + 가짜 브라우저 UA에는 403을 주지만,
@@ -106,7 +108,9 @@ SOA)는 공개 RSS 를 확인하지 못했다(대체로 회원 대상 발행이�
 | PYMNTS | ✅ | https://www.pymnts.com/feed/ | 전체 | 10 | 무료 |
 | American Banker | ✅ | https://www.americanbanker.com/feed?rss=true | 전체 | 10 | 유료 |
 | Investing.com | ✅ | https://www.investing.com/rss/news.rss | 전체 | 10 | 무료 |
-| Pensions & Investments / Institutional Investor / The Banker | ❌ | — | — | — | — |
+| Pensions & Investments | ❌ | — | — | — | — |
+| Institutional Investor | ❌ | — | — | — | — |
+| The Banker | ❌ | — | — | — | — |
 
 ## 기술 / IT
 
