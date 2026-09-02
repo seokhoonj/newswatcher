@@ -138,6 +138,20 @@ def _poll_returning_one(monkeypatch):
     return writes
 
 
+def _record_prune_calls(monkeypatch) -> list[int]:
+    """Replace FileStore.prune_older_than with a recorder; return the list of keep_days
+    it was called with (empty when the poll never prunes)."""
+    from newswatcher.store import FileStore
+    calls: list[int] = []
+
+    def _record(self, keep_days):
+        calls.append(keep_days)
+        return 0
+
+    monkeypatch.setattr(FileStore, "prune_older_than", _record)
+    return calls
+
+
 def _stub_send_digest(record: list[int]):
     """A send_digest double that records each call and reports no delivery failures."""
     def _send(*args, **kwargs):
@@ -268,6 +282,63 @@ def test_watch_ends_instead_of_looping_on_a_permanent_config_error(monkeypatch, 
     monkeypatch.setattr(cli, "_run_poll", lambda a: ran.append(1))
     assert cli.main(["watch"]) == 1
     assert ran == []   # the loop body never ran
+
+
+def test_poll_prunes_the_archive_when_keep_days_is_set(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCHER_ARCHIVE_KEEP_DAYS", "30")
+    _poll_returning_one(monkeypatch)
+    monkeypatch.setattr(cli, "group_stories", lambda arts, *, threshold: ())
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: ())
+    pruned = _record_prune_calls(monkeypatch)
+    assert cli.main(["poll", "--no-heal", "--to", "you@example.com"]) == 0
+    assert pruned == [30]
+
+
+def test_poll_does_not_prune_the_archive_by_default(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCHER_ARCHIVE_KEEP_DAYS", raising=False)
+    _poll_returning_one(monkeypatch)
+    monkeypatch.setattr(cli, "group_stories", lambda arts, *, threshold: ())
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: ())
+    pruned = _record_prune_calls(monkeypatch)
+    assert cli.main(["poll", "--no-heal", "--to", "you@example.com"]) == 0
+    assert pruned == []   # the archive keeps everything unless the user opts in
+
+
+def test_poll_survives_a_prune_failure_after_delivery(monkeypatch, tmp_path, capsys):
+    # Retention runs after the digest is delivered and the watermark written; an I/O error
+    # deleting an old file is reported but must not fail the already-delivered poll.
+    from newswatcher.errors import ArchiveError
+    from newswatcher.store import FileStore
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCHER_ARCHIVE_KEEP_DAYS", "30")
+    _poll_returning_one(monkeypatch)
+    monkeypatch.setattr(cli, "group_stories", lambda arts, *, threshold: ())
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: ())
+
+    def _boom(self, keep_days):
+        raise ArchiveError("cannot delete")
+
+    monkeypatch.setattr(FileStore, "prune_older_than", _boom)
+    assert cli.main(["poll", "--no-heal", "--to", "you@example.com"]) == 0
+    assert "prune failed" in capsys.readouterr().err
+
+
+def test_poll_rejects_a_nonnumeric_archive_keep_days(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCHER_ARCHIVE_KEEP_DAYS", "forever")
+    _poll_returning_one(monkeypatch)
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
+    assert "NEWSWATCHER_ARCHIVE_KEEP_DAYS" in capsys.readouterr().err
+
+
+def test_poll_rejects_a_non_positive_archive_keep_days(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setenv("NEWSWATCHER_ARCHIVE_KEEP_DAYS", "0")
+    _poll_returning_one(monkeypatch)
+    assert cli.main(["poll", "--no-heal", "--no-store", "--to", "you@example.com"]) == 1
+    assert "NEWSWATCHER_ARCHIVE_KEEP_DAYS" in capsys.readouterr().err
 
 
 def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):

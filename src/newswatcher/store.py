@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from newswatcher._atomic import write_bytes_atomic
@@ -101,6 +101,37 @@ class FileStore:
             rows.append((moment, article))
         rows.sort(key=lambda row: (row[0], row[1].guid))
         return tuple(article for _, article in rows)
+
+    def prune_older_than(self, keep_days: int) -> int:
+        """Delete archived articles older than ``keep_days`` days; return how many were
+        removed. Off unless a caller opts in -- the archive is durable, so nothing here
+        runs by default. An article is dated by its ``published`` date, or by its archive
+        timestamp when it has none (the same basis ``load`` orders by). Best-effort and
+        re-runnable: a corrupt, forward-schema, or vanished file is left in place, never
+        deleted on a guess.
+
+        Raises:
+            ValueError: ``keep_days`` is not a positive whole number of days.
+            ArchiveError: a stored file could not be read or deleted (an I/O failure).
+        """
+        if keep_days < 1:
+            raise ValueError(f"keep_days must be a positive number of days, got {keep_days}")
+        cutoff = (datetime.now(UTC) - timedelta(days=keep_days)).strftime(_TIMESTAMP_FORMAT)
+        removed = 0
+        for path in self._dir.glob("*.json"):
+            article, saved_at = _read_article(path)
+            if article is None:
+                continue   # corrupt / forward-schema: not ours to delete on a parse miss
+            if (article.published or saved_at) >= cutoff:
+                continue
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                continue   # already gone (a concurrent prune) -- not an error
+            except OSError as err:
+                raise ArchiveError(f"could not delete {path}: {err}") from err
+            removed += 1
+        return removed
 
 
 def _key(guid: str) -> str:

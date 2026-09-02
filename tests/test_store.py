@@ -48,6 +48,51 @@ def test_load_date_range_is_half_open(tmp_path):
     assert got == {"at_since", "mid"}   # since inclusive, until exclusive
 
 
+class _FixedDatetime:
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 9, 15, 12, 0, 0, tzinfo=tz)
+
+
+def test_prune_removes_only_articles_older_than_the_window(tmp_path, monkeypatch):
+    import newswatcher.store as store_mod
+
+    monkeypatch.setattr(store_mod, "datetime", _FixedDatetime)   # pin "now" so the cutoff is fixed
+    store = FileStore(tmp_path)
+    store.save(_article("old", "2026-07-01T00:00:00Z"))      # 76 days back
+    store.save(_article("recent", "2026-09-10T00:00:00Z"))   # 5 days back
+    removed = store.prune_older_than(30)   # cutoff = 2026-08-16
+    assert removed == 1
+    assert {a.guid for a in store.load()} == {"recent"}
+
+
+def test_prune_keeps_an_undated_article_within_the_window(tmp_path, monkeypatch):
+    import newswatcher.store as store_mod
+
+    monkeypatch.setattr(store_mod, "datetime", _FixedDatetime)
+    store = FileStore(tmp_path)
+    store.save(_article("undated", ""))   # no published date -> dated by saved_at (= now)
+    assert store.prune_older_than(30) == 0
+    assert {a.guid for a in store.load()} == {"undated"}
+
+
+def test_prune_leaves_corrupt_files_in_place(tmp_path, monkeypatch):
+    import newswatcher.store as store_mod
+
+    monkeypatch.setattr(store_mod, "datetime", _FixedDatetime)
+    store = FileStore(tmp_path)
+    store.save(_article("old", "2026-01-01T00:00:00Z"))
+    corrupt = tmp_path / "articles" / "deadbeef.json"
+    corrupt.write_text("{not json", encoding="utf-8")   # unparseable: never deleted on a guess
+    assert store.prune_older_than(30) == 1   # only the dated, old article
+    assert corrupt.exists()
+
+
+def test_prune_rejects_a_non_positive_window(tmp_path):
+    with pytest.raises(ValueError):
+        FileStore(tmp_path).prune_older_than(0)
+
+
 def test_load_falls_back_to_saved_at_when_published_empty(tmp_path, monkeypatch):
     import newswatcher.store as store_mod
 

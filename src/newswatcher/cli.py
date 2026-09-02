@@ -18,7 +18,7 @@ import time
 from newswatcher import __version__, config
 from newswatcher._llm import DEFAULT_PROVIDER, validate_provider
 from newswatcher.digest import send_digest
-from newswatcher.errors import ConfigError, NewswatcherError
+from newswatcher.errors import ArchiveError, ConfigError, NewswatcherError
 from newswatcher.feed import parse_feed
 from newswatcher.heal import heal_empty_sources, heal_source
 from newswatcher.http import default_gate, get, new_session
@@ -43,6 +43,7 @@ __all__ = ["main"]
 _DIGEST_TO_ENV = "NEWSWATCHER_DIGEST_TO"
 _DIGEST_PUSH_ENV = "NEWSWATCHER_DIGEST_PUSH"
 _DEDUP_THRESHOLD_ENV = "NEWSWATCHER_DEDUP_THRESHOLD"
+_ARCHIVE_KEEP_DAYS_ENV = "NEWSWATCHER_ARCHIVE_KEEP_DAYS"
 _LLM_PROVIDER_ENV = "NEWSWATCHER_LLM_PROVIDER"
 _LLM_MODEL_ENV = "NEWSWATCHER_LLM_MODEL"
 
@@ -80,6 +81,31 @@ def _resolve_dedup_threshold() -> float:
             f"{_DEDUP_THRESHOLD_ENV} must be a number between 0 and 1, got {raw!r}") from err
     if not 0.0 <= value <= 1.0:
         raise ConfigError(f"{_DEDUP_THRESHOLD_ENV} must be between 0 and 1, got {value}")
+    return value
+
+
+def _resolve_archive_keep_days() -> int | None:
+    """How many days of archived articles to keep, or ``None`` to keep everything (the
+    default). The archive is durable, so pruning is opt-in via
+    ``NEWSWATCHER_ARCHIVE_KEEP_DAYS``; when set, a poll deletes archived articles older
+    than that after delivering the digest.
+
+    Raises:
+        ConfigError: the setting is present but not a positive whole number of days --
+            caught here so a typo fails fast rather than silently deleting nothing (or
+            everything).
+    """
+    raw = config.setting(_ARCHIVE_KEEP_DAYS_ENV)
+    if raw is None:
+        return None
+    try:
+        value = int(raw)
+    except ValueError as err:
+        raise ConfigError(
+            f"{_ARCHIVE_KEEP_DAYS_ENV} must be a positive whole number of days, "
+            f"got {raw!r}") from err
+    if value < 1:
+        raise ConfigError(f"{_ARCHIVE_KEEP_DAYS_ENV} must be at least 1 day, got {value}")
     return value
 
 
@@ -176,6 +202,7 @@ def _poll_once(args: argparse.Namespace) -> int:
     store = None if args.no_store else FileStore()
     provider, model = _resolve_llm_choice(args)
     threshold = _resolve_dedup_threshold()   # validate up-front, before the poll spends the LLM
+    keep_days = _resolve_archive_keep_days()   # ditto -- a bad value should not survive a poll
     summarize = functools.partial(summarize_article, provider=provider, model=model)
     with new_session() as session:   # one pooled connection for every fetch this poll
         report = poll_sources(sources, topics, gate=gate, state=state, store=store,
@@ -207,6 +234,19 @@ def _poll_once(args: argparse.Namespace) -> int:
     # The reverse window is the accepted cost of send-before-persist: if this atomic write
     # itself fails after a good send, next run re-sends the whole digest.
     write_state(state)
+    # Prune only after the digest is out and the watermark is written, and only when the
+    # user opted into a retention window -- the archive keeps everything by default. This
+    # is best-effort cleanup after a delivered digest: an I/O error deleting an old file is
+    # reported but does not fail the poll (the digest is already out and the watermark
+    # written), and the next run retries the prune.
+    if store is not None and keep_days is not None:
+        try:
+            removed = store.prune_older_than(keep_days)
+        except ArchiveError as err:
+            print(f"newswatcher: archive prune failed: {err}", file=sys.stderr)
+        else:
+            if removed:
+                print(f"pruned {removed} archived article(s) older than {keep_days} day(s)")
     print(f"{len(report.collected)} new article(s)")
     return 0
 
@@ -221,6 +261,7 @@ def _run_watch(args: argparse.Namespace) -> int:
     # than spinning the loop (the file is re-read each tick, so a mid-run fix still recovers).
     _resolve_llm_choice(args)
     _resolve_dedup_threshold()
+    _resolve_archive_keep_days()
     read_state()
     print(f"watching every {every} min; Ctrl-C to stop", file=sys.stderr)
     next_tick = time.monotonic()

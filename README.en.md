@@ -157,7 +157,11 @@ take precedence over corresponding settings there. For example,
 headlines must be to collapse as one story — raise it to merge less, lower it to merge
 more. The article archive and run state use
 the XDG data and state directories; `NEWSWATCHER_DATA_DIR` and
-`NEWSWATCHER_STATE_DIR` can override them.
+`NEWSWATCHER_STATE_DIR` can override them. The archive deletes nothing by default; to
+prune old records, set `NEWSWATCHER_ARCHIVE_KEEP_DAYS` (`archive_keep_days`, a positive
+integer) and each poll removes archived articles older than that after the digest is
+sent. Leaving it unset keeps everything (this deletion is irreversible, so enable it
+deliberately).
 
 ## Provider keys and model
 

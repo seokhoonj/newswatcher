@@ -153,6 +153,10 @@ crawl 소스에는 `item`, `title`, `link` selector (HTML에서 원하는 요소
 두 헤드라인이 얼마나 비슷해야 한 사건으로 묶일지를 정합니다 — 높이면 덜 묶고, 낮추면 더 묶습니다.
 기사 archive (지속적으로 보관하는 기록)와 실행 상태는 XDG data/state 디렉터리를
 사용하며, `NEWSWATCHER_DATA_DIR`와 `NEWSWATCHER_STATE_DIR`로 위치를 바꿀 수 있습니다.
+archive는 기본적으로 아무것도 지우지 않습니다. 오래된 기록을 정리하려면
+`NEWSWATCHER_ARCHIVE_KEEP_DAYS`(`archive_keep_days`, 양의 정수)를 설정하세요 — 각
+poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다. 미설정이면 무한 보관합니다
+(이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요).
 
 ## provider 키와 모델
 
