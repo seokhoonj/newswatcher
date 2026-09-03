@@ -22,6 +22,45 @@ def test_save_then_load_roundtrip(tmp_path):
     assert loaded[0].summary == "our summary"
 
 
+def test_save_and_load_preserves_region(tmp_path):
+    store = FileStore(tmp_path)
+    store.save(Article(guid="i", title="Global rates", link="https://e/i", source_name="s",
+                       published="2026-08-16T00:00:00Z", topics=("t",), region="intl",
+                       summary="x"))
+    store.save(Article(guid="k", title="코스피", link="https://e/k", source_name="s",
+                       published="2026-08-15T00:00:00Z", topics=("t",), region="kr",
+                       summary="x"))
+    assert {a.guid: a.region for a in store.load()} == {"i": "intl", "k": "kr"}
+
+
+def test_v1_file_without_region_infers_from_title(tmp_path):
+    articles = tmp_path / "articles"
+    articles.mkdir(parents=True)
+
+    def write_v1(name, title):
+        envelope = {"schema_version": 1, "saved_at": "2026-08-15T00:00:00Z",
+                    "article": {"guid": name, "title": title, "link": "l", "source_name": "s",
+                                "published": "2026-08-15T00:00:00Z", "topics": ["t"],
+                                "summary": "x"}}
+        (articles / f"{name}.json").write_text(json.dumps(envelope), encoding="utf-8")
+
+    write_v1("kr", "코스피 3000 돌파")
+    write_v1("en", "Market rally continues")
+    by_title = {a.title: a.region for a in FileStore(tmp_path).load()}
+    assert by_title["코스피 3000 돌파"] == "kr"        # inferred from the Korean title
+    assert by_title["Market rally continues"] == "intl"
+
+
+def test_forward_schema_file_is_read_as_absent(tmp_path):
+    articles = tmp_path / "articles"
+    articles.mkdir(parents=True)
+    envelope = {"schema_version": 99, "saved_at": "2026-08-15T00:00:00Z",
+                "article": {"guid": "g", "title": "t", "link": "l", "source_name": "s",
+                            "published": "", "topics": [], "summary": "x"}}
+    (articles / "g.json").write_text(json.dumps(envelope), encoding="utf-8")
+    assert FileStore(tmp_path).load() == ()   # a newer schema is skipped, not fatal
+
+
 def test_save_is_idempotent_by_guid(tmp_path):
     store = FileStore(tmp_path)
     store.save(_article("a1", "2026-08-15T00:00:00Z", title="first"))

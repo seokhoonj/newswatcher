@@ -8,6 +8,9 @@ A source yields a stream of articles by one of two means:
   only where the site has no feed and its robots.txt permits fetching (see ``crawl``).
 
 ``topics`` names the topics this source is tested against and tagged with.
+``region`` marks the source ``kr`` (domestic) or ``intl`` (overseas) for the digest's
+domestic/overseas split; left empty, each article's region is inferred from its title
+language (see ``region``).
 ``keep_all`` skips the keyword filter for the source — every article is kept and
 tagged with ``topics`` — which is how a trade paper (whole feed on-topic) is taken
 in full while a general paper is keyword-filtered. ``body_selector`` optionally
@@ -24,6 +27,7 @@ from newswatcher import _toml
 from newswatcher._atomic import write_text_atomic
 from newswatcher.config import config_dir
 from newswatcher.errors import SourceError
+from newswatcher.region import REGIONS
 
 __all__ = ["Source", "SourceKind", "sources_path", "load_sources", "add_source",
            "update_selectors"]
@@ -46,6 +50,7 @@ class Source:
     kind:          SourceKind = field(default="rss", kw_only=True)
     url:           str = field(default="", kw_only=True)
     topics:        tuple[str, ...] = field(default=(), kw_only=True)
+    region:        str = field(default="", kw_only=True)
     keep_all:      bool = field(default=False, kw_only=True)
     item:          str | None = field(default=None, kw_only=True)
     title:         str | None = field(default=None, kw_only=True)
@@ -132,6 +137,7 @@ def _source_from(entry: dict[str, object], path: Path) -> Source:
         kind=kind,
         url=url.strip(),
         topics=_str_tuple(entry.get("topics", ()), name),
+        region=_region(entry.get("region", ""), name),
         keep_all=_bool(entry.get("keep_all", False), name),
         item=_opt_str(entry.get("item")),
         title=_opt_str(entry.get("title")),
@@ -168,6 +174,17 @@ def _bool(raw: object, name: object) -> bool:
     return raw
 
 
+def _region(raw: object, name: object) -> str:
+    """An empty string (infer per article) or one of ``REGIONS``; anything else is a
+    typo worth stopping on rather than silently mislabeling a source's articles."""
+    if raw is None or raw == "":
+        return ""
+    if not isinstance(raw, str) or raw not in REGIONS:
+        raise SourceError(
+            f"source {name!r}: region must be one of {', '.join(REGIONS)}, got {raw!r}")
+    return raw
+
+
 def _opt_str(raw: object) -> str | None:
     if raw is None:
         return None
@@ -187,6 +204,8 @@ def _render(sources: tuple[Source, ...]) -> str:
         ]
         if s.topics:
             lines.append(f"topics = {_toml.array(s.topics)}")
+        if s.region:
+            lines.append(f"region = {_toml.quote(s.region)}")
         if s.keep_all:
             lines.append("keep_all = true")
         for field_name in _SOURCE_SELECTOR_FIELDS:

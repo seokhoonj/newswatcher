@@ -16,6 +16,7 @@ from newswatcher.crawl import crawl_items
 from newswatcher.errors import NewswatcherError
 from newswatcher.feed import FeedItem, fetch_feed
 from newswatcher.match import assign_topics
+from newswatcher.region import resolve_region
 from newswatcher.robots import RobotsGate
 from newswatcher.sources import Source
 from newswatcher.state import State
@@ -94,6 +95,7 @@ def _articles_from(
             article = Article(
                 guid=tagged.guid, title=tagged.title, link=tagged.link,
                 source_name=source.name, published=tagged.published, topics=tagged.topics,
+                region=resolve_region(source.region, tagged.title),
                 summary=summary.text, summary_model=summary.model,
             )
             if store is not None:

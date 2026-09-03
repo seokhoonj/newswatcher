@@ -341,6 +341,26 @@ def test_poll_rejects_a_non_positive_archive_keep_days(monkeypatch, tmp_path, ca
     assert "NEWSWATCHER_ARCHIVE_KEEP_DAYS" in capsys.readouterr().err
 
 
+def test_add_source_records_region(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    from newswatcher.sources import load_sources
+    assert cli.main(["add-source", "KR", "https://k/rss", "--region", "kr"]) == 0
+    assert load_sources()[0].region == "kr"
+
+
+def test_digest_command_renders_html_from_the_archive(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    from newswatcher.store import Article, FileStore
+    FileStore().save(Article(guid="g1", title="코스피 급등", link="https://e/1",
+                             source_name="한경", published="2026-09-01T00:00:00Z",
+                             topics=("markets",), region="kr", summary="요약"))
+    out = tmp_path / "digest.html"
+    # A fixed-old --since bound keeps the row in range whenever the test runs.
+    assert cli.main(["digest", "--html", str(out), "--since", "2000-01-01"]) == 0
+    html = out.read_text(encoding="utf-8")
+    assert "코스피 급등" in html and 'data-region="kr"' in html and "<style>" in html
+
+
 def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
     from newswatcher.lock import single_instance
     _xdg(monkeypatch, tmp_path)
