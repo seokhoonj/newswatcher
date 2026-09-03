@@ -159,7 +159,9 @@ def _read_article(path: Path) -> tuple[Article | None, str]:
     if not isinstance(envelope, dict):
         return None, ""
     version = envelope.get("schema_version")
-    if not (version is None or (isinstance(version, int) and version <= _SCHEMA_VERSION)):
+    # type(...) is int, not isinstance: a JSON bool is an int subclass, so isinstance would
+    # accept `true`/`false` as a version and read the file rather than skipping it.
+    if not (version is None or (type(version) is int and version <= _SCHEMA_VERSION)):
         return None, ""   # a newer schema (or a corrupt version); read as absent, not fatal
     body = envelope.get("article")
     saved_at = envelope.get("saved_at")

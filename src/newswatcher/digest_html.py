@@ -12,11 +12,14 @@ opens the same from a file:// path or behind any host."""
 from __future__ import annotations
 
 import html
+from urllib.parse import urlsplit
 
-from newswatcher.region import REGIONS, region_label
+from newswatcher.region import DEFAULT_REGION, REGIONS, region_label
 from newswatcher.stories import Story
 
 __all__ = ["render_html"]
+
+_SAFE_HREF_SCHEMES = frozenset({"http", "https", "mailto"})
 
 # A muted categorical palette, assigned to topics in first-appearance order. Kept
 # low-saturation so several dots on one page read as a set, not a rainbow, and legible on
@@ -25,7 +28,7 @@ _TOPIC_COLORS = (
     "#2f8f94", "#5f7ea0", "#7d6cab", "#b0862f",
     "#4e8c6a", "#b26670", "#3a8fa0", "#8a7f4e",
 )
-_ALL = "__all__"
+_ALL_TOPICS = "__all__"
 
 
 def render_html(stories: tuple[Story, ...], *, title: str, period_label: str,
@@ -41,18 +44,39 @@ def render_html(stories: tuple[Story, ...], *, title: str, period_label: str,
         '<div class="wrap">',
         _masthead(title, period_label, generated_at, stories),
         _stats(stories),
-        _tabs(stories),
-        _filter(stories, colors),
-        _feed(stories, colors),
+        _render_tabs(stories),
+        _render_topic_filter(stories, colors),
+        _render_story_feed(stories, colors),
         _footer(period_label),
         "</div>",
     ))
-    return f"<title>{_esc(title)}</title>\n<style>{_CSS}</style>\n{body}\n<script>{_SCRIPT}</script>\n"
+    return (
+        "<!doctype html>\n"
+        '<html lang="ko">\n<head>\n<meta charset="utf-8">\n'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+        f"<title>{_escape_html(title)}</title>\n<style>{_CSS}</style>\n</head>\n"
+        f"<body>\n{body}\n<script>{_SCRIPT}</script>\n</body>\n</html>\n"
+    )
 
 
-def _esc(text: str) -> str:
+def _escape_html(text: str) -> str:
     """HTML-escape ``text`` for both element content and double-quoted attributes."""
     return html.escape(text, quote=True)
+
+
+def _safe_href(link: str) -> str:
+    """An escaped ``href="..."`` for a web-safe scheme, or ``""`` to drop the link. A
+    stored article link comes from a third-party feed, and ``html.escape`` neutralizes an
+    attribute breakout but NOT the URL scheme -- a ``javascript:`` / ``data:`` link would
+    otherwise render as a clickable one-click code-exec. Allowlist http/https/mailto by the
+    parsed scheme (which lower-cases it and strips the leading tab/newline tricks a bare
+    prefix check would miss); a dropped link renders as an hrefless title, the same as a
+    missing link."""
+    try:
+        scheme = urlsplit(link).scheme.lower()
+    except ValueError:
+        return ""
+    return f' href="{_escape_html(link)}"' if scheme in _SAFE_HREF_SCHEMES else ""
 
 
 def _topic_colors(stories: tuple[Story, ...]) -> dict[str, str]:
@@ -60,21 +84,21 @@ def _topic_colors(stories: tuple[Story, ...]) -> dict[str, str]:
     cycling the palette if there are more topics than colors."""
     colors: dict[str, str] = {}
     for story in stories:
-        topic = _topic_of(story)
+        topic = _select_primary_topic(story)
         if topic not in colors:
             colors[topic] = _TOPIC_COLORS[len(colors) % len(_TOPIC_COLORS)]
     return colors
 
 
-def _topic_of(story: Story) -> str:
+def _select_primary_topic(story: Story) -> str:
     return story.lead.topics[0] if story.lead.topics else "기타"
 
 
-def _region_of(story: Story) -> str:
-    return story.lead.region if story.lead.region in REGIONS else "kr"
+def _resolve_story_region(story: Story) -> str:
+    return story.lead.region if story.lead.region in REGIONS else DEFAULT_REGION
 
 
-def _short_date(published: str) -> str:
+def _format_short_date(published: str) -> str:
     """``MM.DD`` from an ISO-8601 ``YYYY-MM-DD...`` string, or ``""`` when there is no date.
     Deliberately date-only: the stored time is UTC, and a bare month-day avoids showing a
     reader a timezone-shifted clock."""
@@ -82,7 +106,7 @@ def _short_date(published: str) -> str:
 
 
 def _counts(stories: tuple[Story, ...]) -> dict[str, int]:
-    kr = sum(1 for s in stories if _region_of(s) == "kr")
+    kr = sum(1 for s in stories if _resolve_story_region(s) == "kr")
     article_count = sum(1 + len(s.duplicates) for s in stories)
     return {"stories": len(stories), "articles": article_count,
             "merged": article_count - len(stories), "kr": kr, "intl": len(stories) - kr}
@@ -93,7 +117,7 @@ def _outlets(stories: tuple[Story, ...]) -> tuple[int, int, int]:
     total: set[str] = set()
     by_region: dict[str, set[str]] = {"kr": set(), "intl": set()}
     for story in stories:
-        region = _region_of(story)
+        region = _resolve_story_region(story)
         for article in (story.lead, *story.duplicates):
             total.add(article.source_name)
             by_region[region].add(article.source_name)
@@ -117,10 +141,10 @@ def _masthead(title: str, period_label: str, generated_at: str,
     n_outlets = _outlets(stories)[0]
     return (
         '<section class="masthead">'
-        f'<p class="eyebrow">{_esc(period_label)}의 브리핑</p>'
-        f"<h1>{_esc(title)}</h1>"
+        f'<p class="eyebrow">{_escape_html(period_label)}의 브리핑</p>'
+        f"<h1>{_escape_html(title)}</h1>"
         '<p class="masthead__meta">'
-        f"{_esc(generated_at)} 집계 · <b>{n_outlets}</b>개 매체에서 <b>{c['articles']}</b>건을 "
+        f"{_escape_html(generated_at)} 집계 · <b>{n_outlets}</b>개 매체에서 <b>{c['articles']}</b>건을 "
         f"수집해, 같은 사건을 다룬 기사를 묶어 <b>{c['stories']}</b>개 스토리로 정리했습니다."
         "</p></section>"
     )
@@ -130,102 +154,102 @@ def _stats(stories: tuple[Story, ...]) -> str:
     c = _counts(stories)
     total_outlets, kr_outlets, intl_outlets = _outlets(stories)
     top_topic, topic_bar = _topic_summary(stories)
-    region_bar = _bar([(c["kr"], "var(--dot-kr)"), (c["intl"], "var(--dot-intl)")])
+    region_bar = _render_bar([(c["kr"], "var(--dot-kr)"), (c["intl"], "var(--dot-intl)")])
     return (
         '<section class="stats" aria-label="요약 지표">'
-        + _stat("스토리", str(c["stories"]), f"원문 {c['articles']}건 · 중복 {c['merged']}건 병합")
-        + _stat("출처 매체", f"{total_outlets}<small> 곳</small>",
+        + _render_stat("스토리", str(c["stories"]), f"원문 {c['articles']}건 · 중복 {c['merged']}건 병합")
+        + _render_stat("출처 매체", f"{total_outlets}<small> 곳</small>",
                 f"국내 {kr_outlets} · 해외 {intl_outlets}")
-        + _stat("국내 / 해외", f"{c['kr']} / {c['intl']}", "", extra=region_bar)
-        + _stat("상위 테마", _esc(top_topic) or "—", "", extra=topic_bar, small_value=True)
+        + _render_stat("국내 / 해외", f"{c['kr']} / {c['intl']}", "", extra=region_bar)
+        + _render_stat("상위 테마", _escape_html(top_topic) or "—", "", extra=topic_bar, small_value=True)
         + "</section>"
     )
 
 
-def _stat(label: str, value: str, note: str, *, extra: str = "", small_value: bool = False) -> str:
+def _render_stat(label: str, value: str, note: str, *, extra: str = "", small_value: bool = False) -> str:
     value_class = "stat__value stat__value--sm" if small_value else "stat__value"
-    note_html = f'<span class="stat__note">{_esc(note)}</span>' if note else ""
-    return (f'<div class="stat"><span class="stat__label">{_esc(label)}</span>'
+    note_html = f'<span class="stat__note">{_escape_html(note)}</span>' if note else ""
+    return (f'<div class="stat"><span class="stat__label">{_escape_html(label)}</span>'
             f'<span class="{value_class}">{value}</span>{note_html}{extra}</div>')
 
 
 def _topic_summary(stories: tuple[Story, ...]) -> tuple[str, str]:
     counts: dict[str, int] = {}
     for story in stories:
-        counts[_topic_of(story)] = counts.get(_topic_of(story), 0) + 1
+        counts[_select_primary_topic(story)] = counts.get(_select_primary_topic(story), 0) + 1
     if not counts:
         return "", ""
     ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
     colors = _topic_colors(stories)
-    bar = _bar([(n, colors[topic]) for topic, n in ordered])
+    bar = _render_bar([(n, colors[topic]) for topic, n in ordered])
     return ordered[0][0], bar
 
 
-def _bar(segments: list[tuple[int, str]]) -> str:
+def _render_bar(segments: list[tuple[int, str]]) -> str:
     parts = "".join(f'<span style="flex:{max(n, 0)};background:{color}"></span>'
                     for n, color in segments if n > 0)
     return f'<div class="distro" aria-hidden="true">{parts}</div>' if parts else ""
 
 
-def _tabs(stories: tuple[Story, ...]) -> str:
+def _render_tabs(stories: tuple[Story, ...]) -> str:
     c = _counts(stories)
     buttons = []
     for index, region in enumerate(REGIONS):   # kr first, then intl
         active = "true" if index == 0 else "false"
         buttons.append(
             f'<button class="tab" data-region="{region}" role="tab" '
-            f'aria-selected="{active}" type="button">{_esc(region_label(region))}'
+            f'aria-selected="{active}" type="button">{_escape_html(region_label(region))}'
             f'<span class="tab__count">{c[region]}</span></button>')
     return f'<div class="tabs" id="tabs" role="tablist">{"".join(buttons)}</div>'
 
 
-def _filter(stories: tuple[Story, ...], colors: dict[str, str]) -> str:
+def _render_topic_filter(stories: tuple[Story, ...], colors: dict[str, str]) -> str:
     seen: list[str] = []
     for story in stories:
-        if _topic_of(story) not in seen:
-            seen.append(_topic_of(story))
-    chips = [f'<button class="chip" data-topic="{_ALL}" aria-pressed="true" type="button">'
+        if _select_primary_topic(story) not in seen:
+            seen.append(_select_primary_topic(story))
+    chips = [f'<button class="chip" data-topic="{_ALL_TOPICS}" aria-pressed="true" type="button">'
              f'전체 <span class="chip__count">{len(stories)}</span></button>']
     for topic in seen:
-        n = sum(1 for s in stories if _topic_of(s) == topic)
+        n = sum(1 for s in stories if _select_primary_topic(s) == topic)
         chips.append(
-            f'<button class="chip" data-topic="{_esc(topic)}" aria-pressed="false" type="button">'
-            f'<span class="dot" style="--c:{colors[topic]}"></span>{_esc(topic)} '
+            f'<button class="chip" data-topic="{_escape_html(topic)}" aria-pressed="false" type="button">'
+            f'<span class="dot" style="--c:{colors[topic]}"></span>{_escape_html(topic)} '
             f'<span class="chip__count">{n}</span></button>')
     return f'<nav class="filter" id="filter" aria-label="토픽 필터">{"".join(chips)}</nav>'
 
 
-def _feed(stories: tuple[Story, ...], colors: dict[str, str]) -> str:
+def _render_story_feed(stories: tuple[Story, ...], colors: dict[str, str]) -> str:
     if not stories:
         return '<main class="feed"><p class="empty" style="display:block">이 기간에 수집된 스토리가 없습니다.</p></main>'
-    cards = "".join(_card(story, colors, index) for index, story in enumerate(stories))
+    cards = "".join(_render_story_card(story, colors, index) for index, story in enumerate(stories))
     return (f'<main class="feed" id="feed">{cards}'
             '<p class="empty" id="empty">이 조건에 해당하는 스토리가 없습니다.</p></main>')
 
 
-def _card(story: Story, colors: dict[str, str], index: int) -> str:
+def _render_story_card(story: Story, colors: dict[str, str], index: int) -> str:
     lead = story.lead
-    topic = _topic_of(story)
+    topic = _select_primary_topic(story)
     color = colors[topic]
-    date = _short_date(lead.published)
-    date_html = f"<time>{_esc(date)}</time>" if date else ""
+    date = _format_short_date(lead.published)
+    date_html = f"<time>{_escape_html(date)}</time>" if date else ""
     also = story.also_reported_by
     if also:
-        chips = "".join(f'<span class="outlet-chip">{_esc(name)}</span>' for name in also)
+        chips = "".join(f'<span class="outlet-chip">{_escape_html(name)}</span>' for name in also)
         also_html = (f'<span class="also">외 {len(also)}개 매체</span>{chips}')
     else:
         also_html = ""
-    link = f' href="{_esc(lead.link)}"' if lead.link else ""
+    link = _safe_href(lead.link)
     return (
-        f'<article class="story" data-region="{_region_of(story)}" data-topic="{_esc(topic)}" '
+        f'<article class="story" data-region="{_resolve_story_region(story)}" data-topic="{_escape_html(topic)}" '
         f'style="--c:{color};--i:{index}">'
         '<div class="story__rail"></div><div class="story__body">'
         f'<div class="story__eyebrow"><span class="tag"><span class="dot"></span>'
-        f"{_esc(topic)}</span>{date_html}</div>"
+        f"{_escape_html(topic)}</span>{date_html}</div>"
         f'<h3 class="story__head"><a class="story__link"{link} target="_blank" '
-        f'rel="noopener">{_esc(lead.title)}</a></h3>'
-        f'<p class="story__sum">{_esc(lead.summary)}</p>'
-        f'<div class="story__foot"><span class="outlet">{_esc(lead.source_name)}</span>'
+        f'rel="noopener">{_escape_html(lead.title)}</a></h3>'
+        f'<p class="story__sum">{_escape_html(lead.summary)}</p>'
+        f'<div class="story__foot"><span class="outlet">{_escape_html(lead.source_name)}</span>'
         f"{also_html}</div>"
         "</div></article>"
     )
@@ -234,7 +258,7 @@ def _card(story: Story, colors: dict[str, str], index: int) -> str:
 def _footer(period_label: str) -> str:
     return (
         "<footer>"
-        f"{_esc(period_label)} 동안 수집·중복 병합·요약한 스토리입니다. 대표 기사 한 건에 "
+        f"{_escape_html(period_label)} 동안 수집·중복 병합·요약한 스토리입니다. 대표 기사 한 건에 "
         '"외 N개 매체"로 교차 출처를 묶어 보여주며, 요약은 newswatcher가 쓴 원문이 아닌 '
         "자체 요약입니다."
         "</footer>"

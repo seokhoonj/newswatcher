@@ -162,7 +162,8 @@ the XDG data and state directories; `NEWSWATCHER_DATA_DIR` and
 prune old records, set `NEWSWATCHER_ARCHIVE_KEEP_DAYS` (`archive_keep_days`, a positive
 integer) and each poll removes archived articles older than that after the digest is
 sent. Leaving it unset keeps everything (this deletion is irreversible, so enable it
-deliberately).
+deliberately). `NEWSWATCHER_DIGEST_TITLE` (`digest_title`) sets the HTML digest heading
+when `--title` is omitted.
 
 ## Provider keys and model
 

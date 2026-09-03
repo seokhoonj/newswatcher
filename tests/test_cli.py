@@ -361,6 +361,57 @@ def test_digest_command_renders_html_from_the_archive(monkeypatch, tmp_path):
     assert "코스피 급등" in html and 'data-region="kr"' in html and "<style>" in html
 
 
+def test_poll_survives_an_html_write_failure(monkeypatch, tmp_path, capsys):
+    # A failed --html write after a delivered digest must not withhold the watermark, or a
+    # permanently-bad path would re-send the delivered email every tick.
+    from newswatcher.errors import DigestError
+    _xdg(monkeypatch, tmp_path)
+    writes = _poll_returning_one(monkeypatch)
+    monkeypatch.setattr(cli, "group_stories", lambda arts, *, threshold: ())
+    monkeypatch.setattr(cli, "send_digest", lambda *a, **k: ())
+
+    def _boom(*a, **k):
+        raise DigestError("cannot write")
+
+    monkeypatch.setattr(cli, "_write_html_digest", _boom)
+    assert cli.main(["poll", "--no-heal", "--to", "you@example.com",
+                     "--html", str(tmp_path / "x.html")]) == 0
+    assert writes == [1]   # write_state still ran -> watermark advanced despite the failure
+    assert "could not write HTML digest" in capsys.readouterr().err
+
+
+def test_digest_range_window_excludes_out_of_range(monkeypatch, tmp_path):
+    import datetime as _dt
+    _xdg(monkeypatch, tmp_path)
+    from newswatcher.store import Article, FileStore
+
+    class _FixedDatetime:
+        @classmethod
+        def now(cls, tz=None):
+            return _dt.datetime(2026, 9, 3, 12, 0, 0, tzinfo=tz)   # pin "now" for the window
+
+    monkeypatch.setattr(cli, "datetime", _FixedDatetime)
+    store = FileStore()
+    store.save(Article(guid="in", title="최근 뉴스", link="https://e/1", source_name="한경",
+                       published="2026-08-28T00:00:00Z", topics=("markets",), region="kr",
+                       summary="s"))
+    store.save(Article(guid="out", title="오래된 뉴스", link="https://e/2", source_name="한경",
+                       published="2026-08-01T00:00:00Z", topics=("markets",), region="kr",
+                       summary="s"))
+    out = tmp_path / "w.html"
+    assert cli.main(["digest", "--html", str(out), "--range", "week"]) == 0
+    html = out.read_text(encoding="utf-8")
+    assert "최근 뉴스" in html and "오래된 뉴스" not in html and "지난 7일" in html
+
+
+def test_digest_empty_window_renders_valid_page(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    out = tmp_path / "e.html"
+    assert cli.main(["digest", "--html", str(out), "--since", "2099-01-01"]) == 0
+    html = out.read_text(encoding="utf-8")
+    assert "이 기간에 수집된 스토리가 없습니다." in html and "<b>0</b>개 스토리" in html
+
+
 def test_poll_skips_when_another_is_running(monkeypatch, tmp_path, capsys):
     from newswatcher.lock import single_instance
     _xdg(monkeypatch, tmp_path)

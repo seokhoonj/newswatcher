@@ -175,6 +175,7 @@ def _run_sources(args: argparse.Namespace) -> int:
         parts = [source.name, f"[{source.kind}]", source.url]
         if source.topics:
             parts.append(f"topics={list(source.topics)}")
+        parts.append(f"region={source.region}" if source.region else "region=auto")
         if source.keep_all:
             parts.append("keep_all")
         print("  ".join(parts))
@@ -237,9 +238,16 @@ def _poll_once(args: argparse.Namespace) -> int:
                   "email or --push / NEWSWATCHER_DIGEST_PUSH for chat); not sending",
                   file=sys.stderr)
     if args.html:
-        _write_html_digest(stories, Path(args.html), title=_digest_title(args),
-                           period_label="오늘")
-        print(f"wrote HTML digest to {args.html}")
+        # Best-effort, like the chat/email channels above and the prune below: a failed
+        # HTML write is reported but must not withhold the watermark, or a permanently-bad
+        # --html path would re-collect and re-send the already-delivered digest every tick.
+        try:
+            _write_html_digest(stories, Path(args.html), title=_resolve_digest_title(args),
+                               period_label="오늘")
+        except DigestError as err:
+            print(f"newswatcher: could not write HTML digest: {err}", file=sys.stderr)
+        else:
+            print(f"wrote HTML digest to {args.html}")
     # Persist the watermark only after the digest is out (or mailing was skipped): a
     # send failure then re-collects and re-sends next run rather than losing the digest.
     # The reverse window is the accepted cost of send-before-persist: if this atomic write
@@ -306,7 +314,7 @@ def _run_digest(args: argparse.Namespace) -> int:
     threshold = _resolve_dedup_threshold()
     articles = FileStore().load(topic=args.topic, since=since, until=until)
     stories = group_stories(articles, threshold=threshold)
-    _write_html_digest(stories, Path(args.html), title=_digest_title(args), period_label=label)
+    _write_html_digest(stories, Path(args.html), title=_resolve_digest_title(args), period_label=label)
     print(f"wrote {len(stories)} stor{'y' if len(stories) == 1 else 'ies'} "
           f"({label}) to {args.html}")
     return 0
@@ -319,12 +327,12 @@ def _resolve_digest_span(args: argparse.Namespace) -> tuple[str | None, str | No
     if args.since or args.until:
         return args.since, args.until, f"{args.since or '처음'} ~ {args.until or '지금'}"
     windows = {"day": (1, "지난 24시간"), "week": (7, "지난 7일"), "month": (30, "지난 30일")}
-    days, label = windows[args.range_]
+    days, label = windows[args.digest_range]
     since = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
     return since, None, label
 
 
-def _digest_title(args: argparse.Namespace) -> str:
+def _resolve_digest_title(args: argparse.Namespace) -> str:
     """The digest heading: ``--title``, else the ``NEWSWATCHER_DIGEST_TITLE`` setting, else
     a generic default."""
     return args.title or config.setting(_DIGEST_TITLE_ENV) or _DEFAULT_TITLE
@@ -338,7 +346,7 @@ def _write_html_digest(stories: tuple[Story, ...], path: Path, *,
         DigestError: the page could not be written (propagated from the atomic write).
     """
     page = render_html(stories, title=title, period_label=period_label,
-                       generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"))
+                       generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"))
     write_text_atomic(path, page, DigestError)
 
 
@@ -435,7 +443,7 @@ def _build_parser() -> argparse.ArgumentParser:
     digest.add_argument("--html", required=True, metavar="PATH",
                         help="write the digest HTML page to this file")
     digest.add_argument("--range", choices=("day", "week", "month"), default="week",
-                        dest="range_", help="rolling window to cover (default: week)")
+                        dest="digest_range", help="rolling window to cover (default: week)")
     digest.add_argument("--since", default=None, metavar="DATE",
                         help="ISO date lower bound (overrides --range)")
     digest.add_argument("--until", default=None, metavar="DATE", help="ISO date upper bound")

@@ -157,7 +157,8 @@ crawl 소스에는 `item`, `title`, `link` selector (HTML에서 원하는 요소
 archive는 기본적으로 아무것도 지우지 않습니다. 오래된 기록을 정리하려면
 `NEWSWATCHER_ARCHIVE_KEEP_DAYS`(`archive_keep_days`, 양의 정수)를 설정하세요 — 각
 poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다. 미설정이면 무한 보관합니다
-(이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요).
+(이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요). `NEWSWATCHER_DIGEST_TITLE`(`digest_title`)은
+`--title`이 없을 때 HTML 다이제스트의 제목을 정합니다.
 
 ## provider 키와 모델
 

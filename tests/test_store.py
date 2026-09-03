@@ -51,6 +51,36 @@ def test_v1_file_without_region_infers_from_title(tmp_path):
     assert by_title["Market rally continues"] == "intl"
 
 
+@pytest.mark.parametrize("version", [True, False, 2.0, "2", 99, [2]])
+def test_load_skips_non_integer_schema_versions(tmp_path, version):
+    # A JSON bool is an int subclass, so isinstance(version, int) would wrongly accept it;
+    # the read must use an exact int check and skip every non-int (and forward) version.
+    articles = tmp_path / "articles"
+    articles.mkdir(parents=True)
+    envelope = {"schema_version": version, "saved_at": "2026-08-15T00:00:00Z",
+                "article": {"guid": "g", "title": "t", "link": "l", "source_name": "s",
+                            "published": "", "topics": [], "summary": "x"}}
+    (articles / "g.json").write_text(json.dumps(envelope), encoding="utf-8")
+    assert FileStore(tmp_path).load() == ()
+
+
+def test_v2_unknown_region_is_inferred_from_title(tmp_path):
+    articles = tmp_path / "articles"
+    articles.mkdir(parents=True)
+
+    def write_v2(name, title):
+        envelope = {"schema_version": 2, "saved_at": "2026-08-15T00:00:00Z",
+                    "article": {"guid": name, "title": title, "link": "l", "source_name": "s",
+                                "published": "2026-08-15T00:00:00Z", "topics": ["t"],
+                                "summary": "x", "region": "usa"}}   # a foreign region value
+        (articles / f"{name}.json").write_text(json.dumps(envelope), encoding="utf-8")
+
+    write_v2("kr", "코스피 상승")
+    write_v2("en", "Global rates rise")
+    by_title = {a.title: a.region for a in FileStore(tmp_path).load()}
+    assert by_title == {"코스피 상승": "kr", "Global rates rise": "intl"}   # bad code -> inferred
+
+
 def test_forward_schema_file_is_read_as_absent(tmp_path):
     articles = tmp_path / "articles"
     articles.mkdir(parents=True)

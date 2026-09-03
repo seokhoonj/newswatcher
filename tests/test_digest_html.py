@@ -1,3 +1,5 @@
+import pytest
+
 from newswatcher.digest_html import render_html
 from newswatcher.store import Article
 from newswatcher.stories import Story
@@ -16,6 +18,17 @@ def _stories():
         Story(lead=_article("K-ICS 자본확충 압박", "한국보험신문", "kr", "규제")),
         Story(lead=_article("장기손해율 개선", "보험매일", "kr", "손해율")),
     )
+
+
+def test_render_is_a_complete_html_document():
+    # The digest --html file is served by any host / opened as a file, so it must carry its
+    # own doctype + charset (else Korean mojibakes under a windows-1252 default) + viewport.
+    html = render_html(_stories(), title="브리핑", period_label="오늘", generated_at="now")
+    assert html.startswith("<!doctype html>")
+    assert '<meta charset="utf-8">' in html
+    assert '<html lang="ko">' in html
+    assert 'name="viewport"' in html
+    assert "<head>" in html and "<body>" in html
 
 
 def test_render_is_self_contained():
@@ -56,6 +69,65 @@ def test_render_groups_and_tags_topics():
     html = render_html(_stories(), title="브리핑", period_label="오늘", generated_at="now")
     for topic in ("재보험", "규제", "손해율"):
         assert f'data-topic="{topic}"' in html
+
+
+@pytest.mark.parametrize("bad_link", [
+    "javascript:alert(document.cookie)",
+    "\tJavaScript:alert(1)",              # leading tab + mixed case: urlsplit still sees javascript
+    "data:text/html,<script>alert(1)</script>",
+    "vbscript:msgbox(1)",
+    "//evil.example/x",                    # protocol-relative: no scheme -> dropped
+])
+def test_render_drops_unsafe_link_schemes(bad_link):
+    # html.escape does not sanitize the URL scheme; a hostile feed link must never become a
+    # clickable href. A dropped link renders as an hrefless title.
+    story = Story(lead=Article(guid="x", title="click me", link=bad_link, source_name="S",
+                               published="2026-09-03T00:00:00Z", topics=("규제",), region="kr",
+                               summary="s"))
+    html = render_html((story,), title="t", period_label="오늘", generated_at="now")
+    assert 'class="story__link" target="_blank"' in html   # no href attribute was inserted
+    assert "javascript" not in html and "vbscript" not in html
+
+
+def test_render_keeps_safe_http_and_mailto_links():
+    for link in ("https://example.com/a", "http://example.com/b", "mailto:x@example.com"):
+        story = Story(lead=Article(guid=link, title="t", link=link, source_name="S",
+                                   published="2026-09-03T00:00:00Z", topics=("규제",),
+                                   region="kr", summary="s"))
+        html = render_html((story,), title="t", period_label="오늘", generated_at="now")
+        assert f'href="{link}"' in html
+
+
+def test_render_defaults_missing_topic_and_unknown_region():
+    # No topics -> "기타"; a region outside REGIONS -> the domestic default.
+    stories = (
+        Story(lead=Article(guid="a", title="무토픽", link="https://e/a", source_name="S",
+                           published="2026-09-03T00:00:00Z", topics=(), region="", summary="s")),
+        Story(lead=Article(guid="b", title="이상region", link="https://e/b", source_name="S",
+                           published="2026-09-03T00:00:00Z", topics=(), region="usa", summary="s")),
+    )
+    html = render_html(stories, title="t", period_label="오늘", generated_at="now")
+    assert html.count('data-region="kr" data-topic="기타"') == 2
+
+
+def test_render_includes_theme_tokens_and_cycles_palette():
+    stories = tuple(
+        Story(lead=Article(guid=str(i), title=f"h{i}", link=f"https://e/{i}", source_name="S",
+                           published="2026-09-03T00:00:00Z", topics=(f"t{i}",), region="kr",
+                           summary="s"))
+        for i in range(9)   # 9 topics > 8-color palette -> the first color repeats
+    )
+    html = render_html(stories, title="t", period_label="오늘", generated_at="now")
+    assert ':root[data-theme="light"]' in html and ':root[data-theme="dark"]' in html
+    assert "prefers-color-scheme:dark" in html
+    assert html.count("--c:#2f8f94;--i:") == 2   # palette[0] reused for the 9th topic
+    assert html.count("--c:#8a7f4e;--i:") == 1   # palette[7] used once
+
+
+def test_render_shows_duplicate_outlet_chips():
+    html = render_html(_stories(), title="t", period_label="오늘", generated_at="now")
+    assert "외 1개 매체" in html
+    assert '<span class="outlet-chip">Commercial Risk</span>' in html
 
 
 def test_render_empty_digest_is_valid():

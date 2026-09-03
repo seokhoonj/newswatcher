@@ -5,7 +5,9 @@ and when it does not, the region is inferred from the article's own title: Korea
 reads as domestic, everything else as overseas. Inference is a sensible default, not a
 rule. An English-language Korean outlet (e.g. an English-titled domestic paper) carries no
 Hangul in its titles, so it should be tagged ``kr`` explicitly rather than left to the
-guess. The primary audience is domestic, so an unclassifiable item lands in ``kr``."""
+guess -- title *inference*, finding no Hangul, resolves to ``intl``. ``DEFAULT_REGION`` is
+a separate fallback: where an *unknown region code* (a stored value that is neither ``kr``
+nor ``intl``) lands, kept domestic because that is the primary audience."""
 
 from __future__ import annotations
 
