@@ -44,16 +44,16 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 
 | Command | What it does |
 |---------|--------------|
-| `add-topic <name> [--include WORD...] [--exclude WORD...]` | Define a topic filter. |
-| `topics` | List the defined topics. |
-| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | Register a source. A crawl source also takes selectors — `--item --title --link` (required), `--date --body-selector` (optional). `--keep-all` keeps every article without keyword filtering. |
-| `sources` | List the registered sources. |
-| `recent <url> [--limit N]` | Preview a feed's latest items without storing, to check it before adding. |
-| `poll` | Collect → summarize → send, once. Options: `--to ADDRESS`, `--push ROUTE`, `--no-mail`, `--no-store`, `--no-heal`, `--provider` / `--model`. |
-| `watch [--every N]` | The same as `poll`, repeated on an interval in the foreground. |
-| `articles [--topic NAME] [--since DATE] [--until DATE]` | List archived articles. |
-| `heal [--dry-run] [--provider P] [--model M]` | Check and repair crawl selectors that stopped matching. |
-| `schedule install\|status\|remove [--every N]` | Register the recurring poll with the OS scheduler. |
+| `add-topic <name> [--include WORD...] [--exclude WORD...]` | Define a topic filter: a name, `--include` keywords (an article matches when it has any one of them), and optional `--exclude` keywords (any one rejects it). Empty includes match every article. |
+| `topics` | List the defined topics with their include / exclude keywords. |
+| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | Register a source — an RSS feed (`--kind rss`) or a robots-permitted crawl page (`--kind crawl`) — and the `--topic`s to test it against. A crawl source also needs selectors: `--item --title --link` (required), `--date --body-selector` (optional). `--keep-all` keeps every article from the source without keyword filtering (for a trade feed that is wholly on-topic). |
+| `sources` | List the registered sources with their kind, URL, and topics. |
+| `recent <url> [--limit N]` | Fetch and print a feed's latest items (title + link) without storing or summarizing — a quick check of a URL before you register it. `--limit N` caps how many. |
+| `poll` | Run one pass: fetch every source, keep the new articles that match a topic, summarize them, archive them, and send the digest. `--to` / `--push` set destinations; `--no-mail` collects without sending; `--no-store` skips archiving; `--no-heal` skips selector repair; `--provider` / `--model` choose the LLM. |
+| `watch [--every N]` | Run `poll` repeatedly in the foreground, every `--every` minutes (default 30), until you stop it. Takes all of `poll`'s options. |
+| `articles [--topic NAME] [--since DATE] [--until DATE]` | List archived articles (title, our summary, link), optionally narrowed to a topic and a half-open `[since, until)` date range. |
+| `heal [--dry-run] [--provider P] [--model M]` | Check crawl sources whose selectors stopped matching and repair them with an LLM, validated against the live page. `--dry-run` reports the proposed fix without writing it. |
+| `schedule install\|status\|remove [--every N]` | Install, show, or remove the recurring poll in the OS scheduler (cron on Linux/macOS, schtasks on Windows). `--every N` sets the interval. |
 
 ## Delivery
 

@@ -43,16 +43,16 @@ newswatcher poll
 
 | 명령 | 하는 일 |
 |------|---------|
-| `add-topic <name> [--include WORD...] [--exclude WORD...]` | 토픽 필터를 정의. |
-| `topics` | 정의된 토픽을 나열. |
-| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | 소스를 등록. crawl 소스는 selector도 받음 — `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 모든 기사 보관. |
-| `sources` | 등록된 소스를 나열. |
-| `recent <url> [--limit N]` | 등록 전에 피드의 최신 항목을 저장 없이 미리 봄. |
-| `poll` | 수집 → 요약 → 발송을 1회. 옵션: `--to ADDRESS`, `--push ROUTE`, `--no-mail`, `--no-store`, `--no-heal`, `--provider` / `--model`. |
-| `watch [--every N]` | `poll`과 같되 포그라운드에서 주기적으로 반복. |
-| `articles [--topic NAME] [--since DATE] [--until DATE]` | archive된 기사를 나열. |
-| `heal [--dry-run] [--provider P] [--model M]` | 매칭이 끊긴 crawl selector를 점검·복구. |
-| `schedule install\|status\|remove [--every N]` | 반복 poll을 운영체제 스케줄러에 등록. |
+| `add-topic <name> [--include WORD...] [--exclude WORD...]` | 토픽 필터 정의: 이름 + `--include` 키워드(하나라도 있으면 매칭) + 선택 `--exclude` 키워드(하나라도 있으면 제외). include가 비면 모든 기사 매칭. |
+| `topics` | 정의된 토픽을 include / exclude 키워드와 함께 나열. |
+| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | 소스 등록 — RSS 피드(`--kind rss`) 또는 robots 허용 크롤 페이지(`--kind crawl`) — 와 테스트할 `--topic`들. crawl 소스는 selector 필요: `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 소스의 모든 기사 보관(피드 전체가 온토픽인 전문지용). |
+| `sources` | 등록된 소스를 kind·URL·토픽과 함께 나열. |
+| `recent <url> [--limit N]` | 피드 최신 항목(제목+링크)을 저장·요약 없이 출력 — 등록 전 URL 확인용. `--limit N`으로 개수 제한. |
+| `poll` | 한 번의 패스: 전 소스 fetch → 토픽에 맞는 새 기사만 요약·아카이브 → 다이제스트 발송. `--to`/`--push`=목적지, `--no-mail`=발송 없이 수집만, `--no-store`=아카이브 안 함, `--no-heal`=selector 복구 생략, `--provider`/`--model`=LLM 선택. |
+| `watch [--every N]` | `poll`을 포그라운드에서 `--every` 분(기본 30)마다 반복, 중단할 때까지. poll의 모든 옵션을 받음. |
+| `articles [--topic NAME] [--since DATE] [--until DATE]` | 아카이브 기사(제목·우리 요약·링크)를 나열, 토픽·반열림 `[since, until)` 날짜 범위로 필터 가능. |
+| `heal [--dry-run] [--provider P] [--model M]` | selector가 끊긴 crawl 소스를 점검해 LLM으로 복구(라이브 페이지로 검증). `--dry-run`은 제안만 보고 쓰지 않음. |
+| `schedule install\|status\|remove [--every N]` | 반복 poll을 OS 스케줄러에 설치·조회·제거(Linux/macOS는 cron, Windows는 schtasks). `--every N`으로 간격 설정. |
 
 ## 전송
 
