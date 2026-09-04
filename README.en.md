@@ -43,11 +43,10 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 `newswatcher --version` prints the version.
 
 - `add-topic <name> [--include WORD...] [--exclude WORD...]` / `topics` — define and list topic filters.
-- `add-source <name> <url> [--kind rss|crawl] [--region kr|intl] [--topic NAME]... [--keep-all]` / `sources` — register and list sources. `--region` marks a source domestic (`kr`) or overseas (`intl`) for the digest's domestic/overseas split; omitted, each article's region is inferred from its title language. A crawl source also takes selectors: `--item --title --link` (required) and `--date --body-selector` (optional). `--keep-all` retains every article without keyword filtering.
+- `add-source <name> <url> [--kind rss|crawl] [--topic NAME]... [--keep-all]` / `sources` — register and list sources. A crawl source also takes selectors: `--item --title --link` (required) and `--date --body-selector` (optional). `--keep-all` retains every article without keyword filtering.
 - `recent <url> [--limit N]` — preview a feed's latest items without storing, to check it before adding.
-- `poll` / `watch [--every N]` — collect → summarize → send once, or repeat on an interval in the foreground. Both accept `--to ADDRESS` (email recipient), `--push ROUTE` (a pushpush chat route), `--html PATH` (also write the digest as an HTML page), `--title`, `--no-mail`, `--no-store`, `--no-heal`, and the LLM `--provider` / `--model` flags.
+- `poll` / `watch [--every N]` — collect → summarize → send once, or repeat on an interval in the foreground. Both accept `--to ADDRESS` (email recipient), `--push ROUTE` (a pushpush chat route), `--no-mail`, `--no-store`, `--no-heal`, and the LLM `--provider` / `--model` flags.
 - `articles [--topic NAME] [--since DATE] [--until DATE]` — list archived articles.
-- `digest --html PATH [--range day|week|month | --since DATE --until DATE] [--topic NAME] [--title T]` — render an HTML digest from the **archive** over a date span, with domestic/overseas tabs and per-topic grouping. Feeds usually expose only recent items, but the archive persists every poll, so weekly and monthly views can be built long afterward.
 - `heal [--dry-run] [--provider P] [--model M]` — check and repair crawl selectors that stopped matching.
 - `schedule install|status|remove [--every N]` — register the recurring poll with the OS
   scheduler.
@@ -162,8 +161,7 @@ the XDG data and state directories; `NEWSWATCHER_DATA_DIR` and
 prune old records, set `NEWSWATCHER_ARCHIVE_KEEP_DAYS` (`archive_keep_days`, a positive
 integer) and each poll removes archived articles older than that after the digest is
 sent. Leaving it unset keeps everything (this deletion is irreversible, so enable it
-deliberately). `NEWSWATCHER_DIGEST_TITLE` (`digest_title`) sets the HTML digest heading
-when `--title` is omitted.
+deliberately).
 
 ## Provider keys and model
 

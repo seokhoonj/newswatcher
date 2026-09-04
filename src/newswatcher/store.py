@@ -17,11 +17,10 @@ from pathlib import Path
 from newswatcher._atomic import write_bytes_atomic
 from newswatcher.config import data_dir
 from newswatcher.errors import ArchiveError
-from newswatcher.region import REGIONS, infer_region
 
 __all__ = ["Article", "FileStore", "archive_root"]
 
-_SCHEMA_VERSION = 2   # v2 adds Article.region; v1 files are read with the region inferred
+_SCHEMA_VERSION = 1
 _ARTICLES_DIRNAME = "articles"
 _TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -30,9 +29,8 @@ _TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 class Article:
     """One archived article: metadata and our summary. No body -- bodies are transient
     summary input, never stored. ``published`` is ISO-8601 (or "") and orders the
-    archive; ``topics`` are the names it was tagged with; ``region`` is ``kr``/``intl`` for
-    the digest's domestic/overseas split; ``summary`` is our original text and
-    ``summary_model`` which model wrote it."""
+    archive; ``topics`` are the names it was tagged with; ``summary`` is our original
+    text and ``summary_model`` which model wrote it."""
 
     guid:          str
     title:         str
@@ -41,7 +39,6 @@ class Article:
     published:     str
     topics:        tuple[str, ...]
     summary:       str
-    region:        str = field(default="")
     summary_model: str = field(default="")
 
 
@@ -158,24 +155,17 @@ def _read_article(path: Path) -> tuple[Article | None, str]:
         return None, ""
     if not isinstance(envelope, dict):
         return None, ""
-    version = envelope.get("schema_version")
-    # type(...) is int, not isinstance: a JSON bool is an int subclass, so isinstance would
-    # accept `true`/`false` as a version and read the file rather than skipping it.
-    if not (version is None or (type(version) is int and version <= _SCHEMA_VERSION)):
-        return None, ""   # a newer schema (or a corrupt version); read as absent, not fatal
+    if envelope.get("schema_version") not in (None, _SCHEMA_VERSION):
+        return None, ""   # written by a newer newswatcher; read as absent, not fatal
     body = envelope.get("article")
     saved_at = envelope.get("saved_at")
     if not isinstance(body, dict) or not isinstance(saved_at, str):
         return None, ""
     try:
-        title = str(body["title"])
-        stored_region = body.get("region")
-        region = (stored_region if isinstance(stored_region, str) and stored_region in REGIONS
-                  else infer_region(title))   # a v1 file has no region -- infer it from the title
         article = Article(
-            guid=str(body["guid"]), title=title, link=str(body["link"]),
+            guid=str(body["guid"]), title=str(body["title"]), link=str(body["link"]),
             source_name=str(body["source_name"]), published=str(body["published"]),
-            topics=tuple(str(t) for t in body.get("topics", ())), region=region,
+            topics=tuple(str(t) for t in body.get("topics", ())),
             summary=str(body["summary"]), summary_model=str(body.get("summary_model", "")),
         )
     except (KeyError, TypeError):

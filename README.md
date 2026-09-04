@@ -42,11 +42,10 @@ newswatcher poll
 `newswatcher --version`은 버전을 출력합니다.
 
 - `add-topic <name> [--include WORD...] [--exclude WORD...]` / `topics` — 토픽 필터를 정의하고 나열합니다.
-- `add-source <name> <url> [--kind rss|crawl] [--region kr|intl] [--topic NAME]... [--keep-all]` / `sources` — 소스를 등록하고 나열합니다. `--region`은 국내(`kr`)/해외(`intl`)를 표시해 다이제스트의 국내/해외 분리에 쓰이며, 생략하면 기사 제목의 언어로 자동 추정합니다. crawl 소스는 selector도 받습니다: `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 모든 기사를 보관합니다.
+- `add-source <name> <url> [--kind rss|crawl] [--topic NAME]... [--keep-all]` / `sources` — 소스를 등록하고 나열합니다. crawl 소스는 selector도 받습니다: `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 모든 기사를 보관합니다.
 - `recent <url> [--limit N]` — 등록 전에 피드의 최신 항목을 저장 없이 미리 봅니다.
-- `poll` / `watch [--every N]` — 수집 → 요약 → 발송을 한 번 수행하거나 주기적으로 포그라운드에서 반복합니다. 둘 다 `--to ADDRESS`(이메일 수신자), `--push ROUTE`(pushpush 채팅 라우트), `--html PATH`(다이제스트를 HTML 페이지로도 저장), `--title`, `--no-mail`, `--no-store`, `--no-heal`, LLM `--provider` / `--model`을 받습니다.
+- `poll` / `watch [--every N]` — 수집 → 요약 → 발송을 한 번 수행하거나 주기적으로 포그라운드에서 반복합니다. 둘 다 `--to ADDRESS`(이메일 수신자), `--push ROUTE`(pushpush 채팅 라우트), `--no-mail`, `--no-store`, `--no-heal`, LLM `--provider` / `--model`을 받습니다.
 - `articles [--topic NAME] [--since DATE] [--until DATE]` — archive된 기사를 나열합니다.
-- `digest --html PATH [--range day|week|month | --since DATE --until DATE] [--topic NAME] [--title T]` — **아카이브**에서 기간을 조회해 국내/해외 탭과 토픽별로 정리한 HTML 다이제스트를 만듭니다. 피드는 보통 최근 항목만 공개하지만 아카이브는 poll 때마다 영구 저장되므로, 주간·월간 뷰를 나중에도 만들 수 있습니다.
 - `heal [--dry-run] [--provider P] [--model M]` — 매칭이 끊긴 crawl selector를 점검하고 복구합니다.
 - `schedule install|status|remove [--every N]` — 반복 poll을 운영체제 스케줄러에 등록합니다.
 
@@ -157,8 +156,7 @@ crawl 소스에는 `item`, `title`, `link` selector (HTML에서 원하는 요소
 archive는 기본적으로 아무것도 지우지 않습니다. 오래된 기록을 정리하려면
 `NEWSWATCHER_ARCHIVE_KEEP_DAYS`(`archive_keep_days`, 양의 정수)를 설정하세요 — 각
 poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다. 미설정이면 무한 보관합니다
-(이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요). `NEWSWATCHER_DIGEST_TITLE`(`digest_title`)은
-`--title`이 없을 때 HTML 다이제스트의 제목을 정합니다.
+(이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요).
 
 ## provider 키와 모델
 

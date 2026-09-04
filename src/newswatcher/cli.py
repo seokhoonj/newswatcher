@@ -3,9 +3,8 @@
 Subcommands compose the library into user actions: ``add-topic`` / ``topics`` and
 ``add-source`` / ``sources`` manage the registries; ``recent`` previews a source
 without storing; ``poll`` runs one collect-summarize-mail pass; ``watch`` repeats it
-on an interval; ``articles`` queries the archive; ``digest`` renders an HTML digest
-from the archive over a date span; ``heal`` checks and repairs crawl selectors;
-``schedule`` registers the cron poll. The CLI is a thin shell -- parse,
+on an interval; ``articles`` queries the archive; ``heal`` checks and repairs crawl
+selectors; ``schedule`` registers the cron poll. The CLI is a thin shell -- parse,
 wire, print -- and every deliberate failure surfaces as one stderr line with a
 non-zero exit."""
 
@@ -15,15 +14,11 @@ import argparse
 import functools
 import sys
 import time
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 from newswatcher import __version__, config
-from newswatcher._atomic import write_text_atomic
 from newswatcher._llm import DEFAULT_PROVIDER, validate_provider
 from newswatcher.digest import send_digest
-from newswatcher.digest_html import render_html
-from newswatcher.errors import ArchiveError, ConfigError, DigestError, NewswatcherError
+from newswatcher.errors import ArchiveError, ConfigError, NewswatcherError
 from newswatcher.feed import parse_feed
 from newswatcher.heal import heal_empty_sources, heal_source
 from newswatcher.http import default_gate, get, new_session
@@ -39,7 +34,7 @@ from newswatcher.schedule import (
 from newswatcher.sources import Source, add_source, load_sources
 from newswatcher.state import read_state, write_state
 from newswatcher.store import FileStore
-from newswatcher.stories import DEFAULT_THRESHOLD, Story, group_stories
+from newswatcher.stories import DEFAULT_THRESHOLD, group_stories
 from newswatcher.summarize import summarize_article
 from newswatcher.topics import Topic, add_topic, load_topics
 
@@ -49,8 +44,6 @@ _DIGEST_TO_ENV = "NEWSWATCHER_DIGEST_TO"
 _DIGEST_PUSH_ENV = "NEWSWATCHER_DIGEST_PUSH"
 _DEDUP_THRESHOLD_ENV = "NEWSWATCHER_DEDUP_THRESHOLD"
 _ARCHIVE_KEEP_DAYS_ENV = "NEWSWATCHER_ARCHIVE_KEEP_DAYS"
-_DIGEST_TITLE_ENV = "NEWSWATCHER_DIGEST_TITLE"
-_DEFAULT_TITLE = "뉴스 브리핑"
 _LLM_PROVIDER_ENV = "NEWSWATCHER_LLM_PROVIDER"
 _LLM_MODEL_ENV = "NEWSWATCHER_LLM_MODEL"
 
@@ -160,7 +153,7 @@ def _run_topics(args: argparse.Namespace) -> int:
 def _run_add_source(args: argparse.Namespace) -> int:
     source = Source(
         args.name, kind=args.kind, url=args.url, topics=tuple(args.topic),
-        region=args.region or "", keep_all=args.keep_all, item=args.item, title=args.title,
+        keep_all=args.keep_all, item=args.item, title=args.title,
         link=args.link, date=args.date, body_selector=args.body_selector,
     )
     if add_source(source):   # validates; a crawl source without selectors raises SourceError
@@ -175,7 +168,6 @@ def _run_sources(args: argparse.Namespace) -> int:
         parts = [source.name, f"[{source.kind}]", source.url]
         if source.topics:
             parts.append(f"topics={list(source.topics)}")
-        parts.append(f"region={source.region}" if source.region else "region=auto")
         if source.keep_all:
             parts.append("keep_all")
         print("  ".join(parts))
@@ -222,11 +214,11 @@ def _poll_once(args: argparse.Namespace) -> int:
         )
     for name, reason in report.skipped:
         print(f"newswatcher: skipping {name}: {reason}", file=sys.stderr)
-    stories = group_stories(report.collected, threshold=threshold)
     if not args.no_mail:
         email_to = args.to or config.setting(_DIGEST_TO_ENV)
         push_to = args.push or config.setting(_DIGEST_PUSH_ENV)
         if email_to or push_to:
+            stories = group_stories(report.collected, threshold=threshold)
             for failure in send_digest(stories, email_to=email_to,
                                        push_to=push_to, heal_notes=heal_notes):
                 # A partial failure (one channel down, another delivered): report it, but do
@@ -237,17 +229,6 @@ def _poll_once(args: argparse.Namespace) -> int:
             print("newswatcher: no digest destination (set --to / NEWSWATCHER_DIGEST_TO for "
                   "email or --push / NEWSWATCHER_DIGEST_PUSH for chat); not sending",
                   file=sys.stderr)
-    if args.html:
-        # Best-effort, like the chat/email channels above and the prune below: a failed
-        # HTML write is reported but must not withhold the watermark, or a permanently-bad
-        # --html path would re-collect and re-send the already-delivered digest every tick.
-        try:
-            _write_html_digest(stories, Path(args.html), title=_resolve_digest_title(args),
-                               period_label="오늘")
-        except DigestError as err:
-            print(f"newswatcher: could not write HTML digest: {err}", file=sys.stderr)
-        else:
-            print(f"wrote HTML digest to {args.html}")
     # Persist the watermark only after the digest is out (or mailing was skipped): a
     # send failure then re-collects and re-sends next run rather than losing the digest.
     # The reverse window is the accepted cost of send-before-persist: if this atomic write
@@ -305,51 +286,6 @@ def _run_articles(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_digest(args: argparse.Namespace) -> int:
-    """Render an HTML digest from the archive over a date span. Reads the durable archive
-    rather than a live poll -- so a weekly or monthly view is available long after the
-    source feeds have rolled over -- collapses cross-source duplicates, and writes one
-    self-contained HTML page."""
-    since, until, label = _resolve_digest_span(args)
-    threshold = _resolve_dedup_threshold()
-    articles = FileStore().load(topic=args.topic, since=since, until=until)
-    stories = group_stories(articles, threshold=threshold)
-    _write_html_digest(stories, Path(args.html), title=_resolve_digest_title(args), period_label=label)
-    print(f"wrote {len(stories)} stor{'y' if len(stories) == 1 else 'ies'} "
-          f"({label}) to {args.html}")
-    return 0
-
-
-def _resolve_digest_span(args: argparse.Namespace) -> tuple[str | None, str | None, str]:
-    """The ``(since, until, label)`` for a digest span. Explicit ``--since`` / ``--until``
-    win; otherwise ``--range`` maps to a rolling window ending now (compared against the
-    archive's ISO-8601 timestamps, so a window bound is itself an ISO-8601 instant)."""
-    if args.since or args.until:
-        return args.since, args.until, f"{args.since or '처음'} ~ {args.until or '지금'}"
-    windows = {"day": (1, "지난 24시간"), "week": (7, "지난 7일"), "month": (30, "지난 30일")}
-    days, label = windows[args.digest_range]
-    since = (datetime.now(UTC) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return since, None, label
-
-
-def _resolve_digest_title(args: argparse.Namespace) -> str:
-    """The digest heading: ``--title``, else the ``NEWSWATCHER_DIGEST_TITLE`` setting, else
-    a generic default."""
-    return args.title or config.setting(_DIGEST_TITLE_ENV) or _DEFAULT_TITLE
-
-
-def _write_html_digest(stories: tuple[Story, ...], path: Path, *,
-                       title: str, period_label: str) -> None:
-    """Render ``stories`` to an HTML page and write it to ``path`` atomically.
-
-    Raises:
-        DigestError: the page could not be written (propagated from the atomic write).
-    """
-    page = render_html(stories, title=title, period_label=period_label,
-                       generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"))
-    write_text_atomic(path, page, DigestError)
-
-
 def _run_heal(args: argparse.Namespace) -> int:
     gate = default_gate()
     provider, model = _resolve_llm_choice(args)
@@ -401,9 +337,6 @@ def _build_parser() -> argparse.ArgumentParser:
     add_source_cmd.add_argument("name")
     add_source_cmd.add_argument("url")
     add_source_cmd.add_argument("--kind", choices=("rss", "crawl"), default="rss")
-    add_source_cmd.add_argument("--region", choices=("kr", "intl"), default=None,
-                                help="kr (domestic) or intl (overseas); inferred from the "
-                                     "article title language when omitted")
     add_source_cmd.add_argument("--topic", action="append", default=[], metavar="NAME",
                                 help="a topic this source subscribes to (repeatable)")
     add_source_cmd.add_argument("--keep-all", action="store_true", dest="keep_all",
@@ -439,18 +372,6 @@ def _build_parser() -> argparse.ArgumentParser:
     articles.add_argument("--until", default=None, metavar="DATE")
     articles.set_defaults(run=_run_articles)
 
-    digest = sub.add_parser("digest", help="render an HTML digest from the archive")
-    digest.add_argument("--html", required=True, metavar="PATH",
-                        help="write the digest HTML page to this file")
-    digest.add_argument("--range", choices=("day", "week", "month"), default="week",
-                        dest="digest_range", help="rolling window to cover (default: week)")
-    digest.add_argument("--since", default=None, metavar="DATE",
-                        help="ISO date lower bound (overrides --range)")
-    digest.add_argument("--until", default=None, metavar="DATE", help="ISO date upper bound")
-    digest.add_argument("--topic", default=None, help="limit to one topic tag")
-    digest.add_argument("--title", default=None, help="digest heading")
-    digest.set_defaults(run=_run_digest)
-
     heal = sub.add_parser("heal", help="check and repair crawl selectors")
     heal.add_argument("--dry-run", action="store_true", dest="dry_run")
     _add_llm_flags(heal)
@@ -474,10 +395,6 @@ def _add_poll_flags(parser: argparse.ArgumentParser) -> None:
                         help="do not archive collected articles")
     parser.add_argument("--no-heal", action="store_true", dest="no_heal",
                         help="do not run selector healing this poll")
-    parser.add_argument("--html", default=None, metavar="PATH",
-                        help="also write this poll's digest as an HTML page to PATH")
-    parser.add_argument("--title", default=None,
-                        help="digest heading (default: NEWSWATCHER_DIGEST_TITLE or a generic title)")
     _add_llm_flags(parser)
 
 
