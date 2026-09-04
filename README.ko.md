@@ -43,10 +43,13 @@ newswatcher poll
 
 | 명령 | 하는 일 |
 |------|---------|
-| `add-topic <name> [--include WORD...] [--exclude WORD...]`<br>`topics` | 토픽 필터를 정의·나열. |
-| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]`<br>`sources` | 소스를 등록·나열. crawl 소스는 selector도 받음 — `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 모든 기사 보관. |
+| `add-topic <name> [--include WORD...] [--exclude WORD...]` | 토픽 필터를 정의. |
+| `topics` | 정의된 토픽을 나열. |
+| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | 소스를 등록. crawl 소스는 selector도 받음 — `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 모든 기사 보관. |
+| `sources` | 등록된 소스를 나열. |
 | `recent <url> [--limit N]` | 등록 전에 피드의 최신 항목을 저장 없이 미리 봄. |
-| `poll`<br>`watch [--every N]` | 수집 → 요약 → 발송을 1회 또는 주기 반복. 둘 다 `--to ADDRESS`, `--push ROUTE`, `--no-mail`, `--no-store`, `--no-heal`, `--provider` / `--model`. |
+| `poll` | 수집 → 요약 → 발송을 1회. 옵션: `--to ADDRESS`, `--push ROUTE`, `--no-mail`, `--no-store`, `--no-heal`, `--provider` / `--model`. |
+| `watch [--every N]` | `poll`과 같되 포그라운드에서 주기적으로 반복. |
 | `articles [--topic NAME] [--since DATE] [--until DATE]` | archive된 기사를 나열. |
 | `heal [--dry-run] [--provider P] [--model M]` | 매칭이 끊긴 crawl selector를 점검·복구. |
 | `schedule install\|status\|remove [--every N]` | 반복 poll을 운영체제 스케줄러에 등록. |

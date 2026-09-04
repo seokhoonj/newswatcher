@@ -44,10 +44,13 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 
 | Command | What it does |
 |---------|--------------|
-| `add-topic <name> [--include WORD...] [--exclude WORD...]`<br>`topics` | Define and list topic filters. |
-| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]`<br>`sources` | Register and list sources. A crawl source also takes selectors — `--item --title --link` (required), `--date --body-selector` (optional). `--keep-all` keeps every article without keyword filtering. |
+| `add-topic <name> [--include WORD...] [--exclude WORD...]` | Define a topic filter. |
+| `topics` | List the defined topics. |
+| `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | Register a source. A crawl source also takes selectors — `--item --title --link` (required), `--date --body-selector` (optional). `--keep-all` keeps every article without keyword filtering. |
+| `sources` | List the registered sources. |
 | `recent <url> [--limit N]` | Preview a feed's latest items without storing, to check it before adding. |
-| `poll`<br>`watch [--every N]` | Collect → summarize → send, once or on an interval. Both take `--to ADDRESS`, `--push ROUTE`, `--no-mail`, `--no-store`, `--no-heal`, `--provider` / `--model`. |
+| `poll` | Collect → summarize → send, once. Options: `--to ADDRESS`, `--push ROUTE`, `--no-mail`, `--no-store`, `--no-heal`, `--provider` / `--model`. |
+| `watch [--every N]` | The same as `poll`, repeated on an interval in the foreground. |
 | `articles [--topic NAME] [--since DATE] [--until DATE]` | List archived articles. |
 | `heal [--dry-run] [--provider P] [--model M]` | Check and repair crawl selectors that stopped matching. |
 | `schedule install\|status\|remove [--every N]` | Register the recurring poll with the OS scheduler. |
