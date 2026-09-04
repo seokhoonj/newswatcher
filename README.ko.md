@@ -52,15 +52,15 @@ newswatcher poll
 ## 전송
 
 다이제스트는 이메일, 채팅, 또는 둘 다로 보낼 수 있습니다. 원하는 대상을 하나 이상
-설정합니다.
+설정합니다. 두 채널 모두 newswatcher와 함께 설치되는 동반 패키지가 처리합니다.
 
-- 이메일은 mailmail로 보냅니다: `--to ADDRESS` 또는 `NEWSWATCHER_DIGEST_TO` 설정
+- 이메일은 mailmail 패키지로 보냅니다: `--to ADDRESS` 또는 `NEWSWATCHER_DIGEST_TO` 설정
   (mailmail 주소나 주소록 별칭).
-- 채팅은 pushpush로 보냅니다: `--push ROUTE` 또는 `NEWSWATCHER_DIGEST_PUSH` 설정으로,
+- 채팅은 pushpush 패키지로 보냅니다: `--push ROUTE` 또는 `NEWSWATCHER_DIGEST_PUSH` 설정으로,
   pushpush에 미리 설정해 둔 라우트(텔레그램·슬랙·디스코드)를 지정합니다. 다이제스트는
   markdown 메시지 한 통으로 전송됩니다.
 
-두 패키지는 newswatcher와 함께 설치되므로, `--push`를 쓰기 전에 pushpush 자체 CLI로
+`--push`를 쓰기 전에 pushpush 자체 CLI로
 라우트만 설정하면 됩니다.
 
 ## 뉴스 피드

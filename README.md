@@ -54,14 +54,15 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 ## Delivery
 
 The digest is sent by email, to a chat channel, or both — set one or both destinations.
+Both channels are handled by companion packages that install alongside newswatcher.
 
-- Email goes through mailmail: `--to ADDRESS` or the `NEWSWATCHER_DIGEST_TO` setting (a
+- Email goes through the mailmail package: `--to ADDRESS` or the `NEWSWATCHER_DIGEST_TO` setting (a
   mailmail address or address-book alias).
-- Chat goes through pushpush: `--push ROUTE` or the `NEWSWATCHER_DIGEST_PUSH` setting,
+- Chat goes through the pushpush package: `--push ROUTE` or the `NEWSWATCHER_DIGEST_PUSH` setting,
   naming a route you configured in pushpush (Telegram, Slack, or Discord). The digest is
   sent as one markdown message.
 
-Both packages are installed with newswatcher; configure a pushpush route with pushpush's
+Configure a pushpush route with pushpush's
 own CLI before using `--push`.
 
 ## News feeds
