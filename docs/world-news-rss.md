@@ -1,150 +1,158 @@
-# 해외 언론사 RSS 피드 목록 (영어권)
+# Overseas (English-language) news RSS feeds
 
-영어권 주요 해외 언론사를 카테고리별로 정리한 표(일반 매체 + 보험/금융 전문지).
-`RSS` 열의 ✅ 는 **실제 fetch로 검증된** 피드가 있다는 뜻이고, ❌ 는 검증 시점에 살아있는
-공개 RSS를 확인하지 못했다는 뜻, 🔒 는 **Cloudflare가 newswatcher UA에도 403을 줘서 폴할 수
-없다는 뜻**이다(피드는 실존). ✅ 의 URL은 그대로 newswatcher `add-source --kind rss` 에 넣을
-수 있다. 피드는 영어이므로 토픽 키워드도 영어로 맞춘다.
+Major English-language overseas outlets by category (general news + insurance/finance trade
+press). In the **RSS** column, ✅ means a feed was **actually fetched and verified**, ❌ means
+no live public RSS could be confirmed at verification time, and 🔒 means the feed exists but
+Cloudflare returns 403 even to newswatcher's own user agent, so it cannot be polled. A ✅ URL
+can go straight into `newswatcher add-source --kind rss`. The feeds are in English, so match
+them with English topic keywords.
 
-- 검증 일자: 2026-09-01
-- 검증 방법: 각 매체의 공개 RSS 후보 경로를 직접 요청해 feedparser로 파싱, 항목(entry)이
-  실제로 채워지는 피드만 ✅ 로 채택. 여러 후보가 있으면 살아있는 것을 골랐다. **최종 판정은
-  newswatcher 자체 fetch(식별 UA + robots 게이트)로 했다** — add-source가 실제로 보내는 요청과
-  같아서, 가짜 브라우저 UA는 막아도 정직한 봇은 통과시키는 Cloudflare 사이트(Reinsurance
-  News, Artemis 등)까지 정확히 판정된다.
-- `항목수` = 검증 시점에 피드가 반환한 기사 개수(살아있음의 신호, 갱신에 따라 달라짐).
-- `범위`: **전체** = 사이트 전체/헤드라인 통합 피드 / **섹션** = 섹션 피드만 확인됨(URL은 대표 섹션).
-- `본문`: **무료** = 기사 전문을 그대로 읽을 수 있음 / **유료** = 피드의 헤드라인·요약은
-  무료지만 전문은 페이월·미터드(metered)라 로그인/결제 없이는 일부만 보임.
+- Verified: 2026-09-01
+- Method: each outlet's likely public RSS paths were requested directly and parsed with
+  `feedparser`, and only feeds that actually returned entries were marked ✅ (the live one was
+  chosen when several candidates existed). **The final check used newswatcher's own fetch (its
+  identifying UA + the robots gate)** — the same request `add-source` makes — so Cloudflare
+  sites that block a fake browser UA but let an honest bot through (Reinsurance News, Artemis,
+  …) are judged correctly.
+- **Items** — how many articles the feed returned at verification. A liveness signal only; it
+  changes as the feed updates.
+- **Scope** — **Full** = one feed for the whole site (or its headline roll-up). **Section** =
+  only per-section feeds were found, and the URL is a representative section.
+- **Body** — **Free** = the full article text is readable. **Paywalled** = the feed's headline
+  and summary are free, but the body is behind a paywall or metered, so only part is visible
+  without a login or payment.
 
-## 본문 유료가 요약에 미치는 영향 (읽고 등록할 것)
+## How a paywalled body affects the summary (read before adding)
 
-RSS **피드 자체는 전부 무료**다(공개 XML, 키 불필요). 다만 `본문=유료` 인 매체는
-newswatcher가 요약을 위해 기사 본문을 fetch할 때 페이월/티저만 잡혀 **요약이 얕아질 수
-있다** — 이때 newswatcher는 기사 전문 대신 피드가 준 짧은 요약으로 자동 대체(fallback)하므로
-동작은 계속되지만 요약 품질은 헤드라인+블러브 수준이 된다. robots 정책이 본문을 막는
-경우도 같은 방식으로 우아하게 대체된다. (Reuters·AP·Bloomberg Terminal 같은 유료 뉴스
-API는 RSS가 아니며 여기 목록과 무관하다.)
+The **RSS feeds themselves are all free** (public XML, no key). But for a `Body = Paywalled`
+outlet, when newswatcher fetches the article body to summarize it, it may catch only the
+paywall or a teaser, so **the summary can be shallow** — newswatcher then falls back to the
+short summary the feed itself provides, so it keeps working but the quality drops to
+headline-plus-blurb. A robots policy that blocks the body degrades the same way. (Paid news
+APIs like Reuters, AP, or the Bloomberg Terminal are not RSS and are unrelated to this list.)
 
-## 통신사 / 글로벌
+## Wire services / global
 
-| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
-|------|:---:|----------|------|-------:|:----:|
-| Al Jazeera | ✅ | https://www.aljazeera.com/xml/rss/all.xml | 전체 | 25 | 무료 |
-| BBC News | ✅ | https://feeds.bbci.co.uk/news/world/rss.xml | 전체 | 38 | 무료 |
-| Deutsche Welle | ✅ | https://rss.dw.com/xml/rss-en-all | 전체 | 135 | 무료 |
-| Euronews | ✅ | https://www.euronews.com/rss | 전체 | 50 | 무료 |
-| France 24 | ✅ | https://www.france24.com/en/france/rss | 섹션 | 30 | 무료 |
-| The Guardian | ✅ | https://www.theguardian.com/world/rss | 전체 | 45 | 무료 |
+| Outlet | RSS | Feed URL | Scope | Items | Body |
+|--------|:---:|----------|-------|------:|:----:|
+| Al Jazeera | ✅ | https://www.aljazeera.com/xml/rss/all.xml | Full | 25 | Free |
+| BBC News | ✅ | https://feeds.bbci.co.uk/news/world/rss.xml | Full | 38 | Free |
+| Deutsche Welle | ✅ | https://rss.dw.com/xml/rss-en-all | Full | 135 | Free |
+| Euronews | ✅ | https://www.euronews.com/rss | Full | 50 | Free |
+| France 24 | ✅ | https://www.france24.com/en/france/rss | Section | 30 | Free |
+| The Guardian | ✅ | https://www.theguardian.com/world/rss | Full | 45 | Free |
 | Associated Press | ❌ | — | — | — | — |
 | Reuters | ❌ | — | — | — | — |
 
-Reuters·AP 는 공개 RSS 제공을 중단했다(유료 뉴스 API로 전환). 비공식 서드파티 미러가
-돌아다니지만 안정성·정당성을 보장할 수 없어 등재하지 않는다. 이 두 곳의 기사는 필요하면
-newswatcher `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드로 우회할 수 있다.
+Reuters and AP have discontinued their public RSS (they moved to paid news APIs). Unofficial
+third-party mirrors circulate but cannot be vouched for on stability or legitimacy, so they
+are not listed. If you need these two, attach them with newswatcher's `--kind crawl` adapter,
+or route around them with a Google News search feed.
 
-## 미국 / 영국 신문·방송
+## US / UK press & broadcast
 
-| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
-|------|:---:|----------|------|-------:|:----:|
-| ABC News | ✅ | https://abcnews.go.com/abcnews/topstories | 전체 | 25 | 무료 |
-| CBS News | ✅ | https://www.cbsnews.com/latest/rss/world | 섹션(World) | 30 | 무료 |
-| CNN | ✅ | http://rss.cnn.com/rss/edition.rss | 전체 | 50 | 무료 |
-| NPR | ✅ | https://feeds.npr.org/1001/rss.xml | 전체 | 10 | 무료 |
-| Sky News | ✅ | https://feeds.skynews.com/feeds/rss/world.xml | 섹션(World) | 8 | 무료 |
-| The Independent | ✅ | https://www.independent.co.uk/news/world/rss | 전체 | 91 | 무료 |
-| The New York Times | ✅ | https://rss.nytimes.com/services/xml/rss/nyt/World.xml | 섹션(World) | 58 | 유료 |
-| The Times of India | ✅ | https://timesofindia.indiatimes.com/rssfeedstopstories.cms | 전체 | 47 | 무료 |
-| The Washington Post | ✅ | https://feeds.washingtonpost.com/rss/world | 섹션(World) | 15 | 유료 |
+| Outlet | RSS | Feed URL | Scope | Items | Body |
+|--------|:---:|----------|-------|------:|:----:|
+| ABC News | ✅ | https://abcnews.go.com/abcnews/topstories | Full | 25 | Free |
+| CBS News | ✅ | https://www.cbsnews.com/latest/rss/world | Section (World) | 30 | Free |
+| CNN | ✅ | http://rss.cnn.com/rss/edition.rss | Full | 50 | Free |
+| NPR | ✅ | https://feeds.npr.org/1001/rss.xml | Full | 10 | Free |
+| Sky News | ✅ | https://feeds.skynews.com/feeds/rss/world.xml | Section (World) | 8 | Free |
+| The Independent | ✅ | https://www.independent.co.uk/news/world/rss | Full | 91 | Free |
+| The New York Times | ✅ | https://rss.nytimes.com/services/xml/rss/nyt/World.xml | Section (World) | 58 | Paywalled |
+| The Times of India | ✅ | https://timesofindia.indiatimes.com/rssfeedstopstories.cms | Full | 47 | Free |
+| The Washington Post | ✅ | https://feeds.washingtonpost.com/rss/world | Section (World) | 15 | Paywalled |
 
-## 경제 / 금융
+## Business / finance
 
-| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
-|------|:---:|----------|------|-------:|:----:|
-| Bloomberg | ✅ | https://feeds.bloomberg.com/markets/news.rss | 섹션(Markets) | 20 | 유료 |
-| Business Insider | ✅ | https://www.businessinsider.com/rss | 전체 | 20 | 무료 |
-| CNBC | ✅ | https://www.cnbc.com/id/100003114/device/rss/rss.html | 섹션 | 30 | 무료 |
-| Financial Times | ✅ | https://www.ft.com/rss/home | 전체 | 10 | 유료 |
-| Forbes | ✅ | https://www.forbes.com/business/feed/ | 섹션 | 25 | 무료 |
-| Fortune | ✅ | https://fortune.com/feed/ | 전체 | 10 | 유료 |
-| MarketWatch | ✅ | http://feeds.marketwatch.com/marketwatch/topstories/ | 전체 | 10 | 무료 |
-| The Economist | ✅ | https://www.economist.com/finance-and-economics/rss.xml | 섹션 | 300 | 유료 |
-| Wall Street Journal | ✅ | https://feeds.a.dj.com/rss/RSSWorldNews.xml | 섹션(World) | 20 | 유료 |
-| Yahoo Finance | ✅ | https://finance.yahoo.com/news/rssindex | 전체 | 50 | 무료 |
+| Outlet | RSS | Feed URL | Scope | Items | Body |
+|--------|:---:|----------|-------|------:|:----:|
+| Bloomberg | ✅ | https://feeds.bloomberg.com/markets/news.rss | Section (Markets) | 20 | Paywalled |
+| Business Insider | ✅ | https://www.businessinsider.com/rss | Full | 20 | Free |
+| CNBC | ✅ | https://www.cnbc.com/id/100003114/device/rss/rss.html | Section | 30 | Free |
+| Financial Times | ✅ | https://www.ft.com/rss/home | Full | 10 | Paywalled |
+| Forbes | ✅ | https://www.forbes.com/business/feed/ | Section | 25 | Free |
+| Fortune | ✅ | https://fortune.com/feed/ | Full | 10 | Paywalled |
+| MarketWatch | ✅ | http://feeds.marketwatch.com/marketwatch/topstories/ | Full | 10 | Free |
+| The Economist | ✅ | https://www.economist.com/finance-and-economics/rss.xml | Section | 300 | Paywalled |
+| Wall Street Journal | ✅ | https://feeds.a.dj.com/rss/RSSWorldNews.xml | Section (World) | 20 | Paywalled |
+| Yahoo Finance | ✅ | https://finance.yahoo.com/news/rssindex | Full | 50 | Free |
 
-## 보험 / 재보험 전문
+## Insurance / reinsurance trade
 
-| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
-|------|:---:|----------|------|-------:|:----:|
-| Artemis (ILS·cat bond) | ✅ | https://www.artemis.bm/feed/ | 전체 | 10 | 무료 |
-| Business Insurance | ✅ | https://www.businessinsurance.com/rss | 전체 | 20 | 유료 |
-| Carrier Management | ✅ | https://www.carriermanagement.com/feed/ | 전체 | 10 | 무료 |
-| Commercial Risk | ✅ | https://www.commercialriskonline.com/feed/ | 전체 | 100 | 무료 |
-| Coverager | ✅ | https://coverager.com/feed/ | 전체 | 10 | 무료 |
-| Digital Insurance | ✅ | https://www.dig-in.com/feed?rss=true | 전체 | 10 | 유료 |
-| Insurance Business | ✅ | https://www.insurancebusinessmag.com/us/rss/ | 전체 | 129 | 무료 |
-| Insurance Journal | ✅ | https://www.insurancejournal.com/feed/ | 전체 | 30 | 무료 |
-| Reinsurance News | ✅ | https://www.reinsurancene.ws/feed/ | 전체 | 10 | 무료 |
-| PropertyCasualty360 | 🔒 | https://www.propertycasualty360.com/feed/ | 전체 | — | 유료 |
+| Outlet | RSS | Feed URL | Scope | Items | Body |
+|--------|:---:|----------|-------|------:|:----:|
+| Artemis (ILS·cat bond) | ✅ | https://www.artemis.bm/feed/ | Full | 10 | Free |
+| Business Insurance | ✅ | https://www.businessinsurance.com/rss | Full | 20 | Paywalled |
+| Carrier Management | ✅ | https://www.carriermanagement.com/feed/ | Full | 10 | Free |
+| Commercial Risk | ✅ | https://www.commercialriskonline.com/feed/ | Full | 100 | Free |
+| Coverager | ✅ | https://coverager.com/feed/ | Full | 10 | Free |
+| Digital Insurance | ✅ | https://www.dig-in.com/feed?rss=true | Full | 10 | Paywalled |
+| Insurance Business | ✅ | https://www.insurancebusinessmag.com/us/rss/ | Full | 129 | Free |
+| Insurance Journal | ✅ | https://www.insurancejournal.com/feed/ | Full | 30 | Free |
+| Reinsurance News | ✅ | https://www.reinsurancene.ws/feed/ | Full | 10 | Free |
+| PropertyCasualty360 | 🔒 | https://www.propertycasualty360.com/feed/ | Full | — | Paywalled |
 | Insurance Insider | ❌ | — | — | — | — |
 | Intelligent Insurer | ❌ | — | — | — | — |
 | The Insurer | ❌ | — | — | — | — |
 
-재보험 핵심인 **Reinsurance News·Artemis 는 ✅** 로 그대로 `add-source --kind rss` 에 넣으면
-된다. 이 두 곳은 Cloudflare 뒤에 있어 데이터센터 IP + 가짜 브라우저 UA에는 403을 주지만,
-newswatcher 의 정직한 식별 UA(`newswatcher (+https://github.com/seokhoonj/newswatcher)`)에는 200
-으로 응답한다 — 스푸핑하지 않는 것이 오히려 통과하는 셈이다. 🔒 인 PropertyCasualty360 은
-newswatcher UA 에도 403 이라 폴할 수 없다. 계리(actuarial) 전문지(The Actuary, Actuarial Post,
-SOA)는 공개 RSS 를 확인하지 못했다(대체로 회원 대상 발행이거나 봇 차단) — `--kind crawl`
-어댑터로 붙일 수 있다.
+For reinsurance, **Reinsurance News and Artemis are ✅** — drop them straight into
+`add-source --kind rss`. Both sit behind Cloudflare and return 403 to a datacenter IP with a
+fake browser UA, but they answer 200 to newswatcher's honest identifying UA
+(`newswatcher (+https://github.com/seokhoonj/newswatcher)`) — not spoofing is what gets you
+through. 🔒 PropertyCasualty360 returns 403 even to newswatcher's UA, so it cannot be polled.
+Actuarial trade press (The Actuary, Actuarial Post, SOA) had no public RSS to confirm (mostly
+member-only publishing or bot-blocked) — attach it with the `--kind crawl` adapter.
 
-## 금융 / 핀테크 전문
+## Finance / fintech trade
 
-| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
-|------|:---:|----------|------|-------:|:----:|
-| American Banker | ✅ | https://www.americanbanker.com/feed?rss=true | 전체 | 10 | 유료 |
-| CoinDesk | ✅ | https://www.coindesk.com/arc/outboundfeeds/rss/ | 전체 | 25 | 무료 |
-| Finextra | ✅ | https://www.finextra.com/rss/headlines.aspx | 전체 | 57 | 무료 |
-| Investing.com | ✅ | https://www.investing.com/rss/news.rss | 전체 | 10 | 무료 |
-| PYMNTS | ✅ | https://www.pymnts.com/feed/ | 전체 | 10 | 무료 |
-| Seeking Alpha | ✅ | https://seekingalpha.com/feed.xml | 전체 | 30 | 유료 |
+| Outlet | RSS | Feed URL | Scope | Items | Body |
+|--------|:---:|----------|-------|------:|:----:|
+| American Banker | ✅ | https://www.americanbanker.com/feed?rss=true | Full | 10 | Paywalled |
+| CoinDesk | ✅ | https://www.coindesk.com/arc/outboundfeeds/rss/ | Full | 25 | Free |
+| Finextra | ✅ | https://www.finextra.com/rss/headlines.aspx | Full | 57 | Free |
+| Investing.com | ✅ | https://www.investing.com/rss/news.rss | Full | 10 | Free |
+| PYMNTS | ✅ | https://www.pymnts.com/feed/ | Full | 10 | Free |
+| Seeking Alpha | ✅ | https://seekingalpha.com/feed.xml | Full | 30 | Paywalled |
 | Institutional Investor | ❌ | — | — | — | — |
 | Pensions & Investments | ❌ | — | — | — | — |
 | The Banker | ❌ | — | — | — | — |
 
-## 기술 / IT
+## Technology / IT
 
-| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
-|------|:---:|----------|------|-------:|:----:|
-| Ars Technica | ✅ | https://feeds.arstechnica.com/arstechnica/index | 전체 | 20 | 무료 |
-| Engadget | ✅ | https://www.engadget.com/rss.xml | 전체 | 20 | 무료 |
-| Hacker News | ✅ | https://hnrss.org/frontpage | 전체 | 20 | 무료 |
-| MIT Technology Review | ✅ | https://www.technologyreview.com/feed/ | 전체 | 10 | 유료 |
-| TechCrunch | ✅ | https://techcrunch.com/feed/ | 전체 | 20 | 무료 |
-| The Verge | ✅ | https://www.theverge.com/rss/index.xml | 전체 | 10 | 무료 |
-| Wired | ✅ | https://www.wired.com/feed/rss | 전체 | 50 | 유료 |
+| Outlet | RSS | Feed URL | Scope | Items | Body |
+|--------|:---:|----------|-------|------:|:----:|
+| Ars Technica | ✅ | https://feeds.arstechnica.com/arstechnica/index | Full | 20 | Free |
+| Engadget | ✅ | https://www.engadget.com/rss.xml | Full | 20 | Free |
+| Hacker News | ✅ | https://hnrss.org/frontpage | Full | 20 | Free |
+| MIT Technology Review | ✅ | https://www.technologyreview.com/feed/ | Full | 10 | Paywalled |
+| TechCrunch | ✅ | https://techcrunch.com/feed/ | Full | 20 | Free |
+| The Verge | ✅ | https://www.theverge.com/rss/index.xml | Full | 10 | Free |
+| Wired | ✅ | https://www.wired.com/feed/rss | Full | 50 | Paywalled |
 | ZDNet | ❌ | — | — | — | — |
 
-## 과학
+## Science
 
-| 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
-|------|:---:|----------|------|-------:|:----:|
-| Nature | ✅ | https://www.nature.com/nature.rss | 전체 | 75 | 유료 |
-| New Scientist | ✅ | https://www.newscientist.com/section/news/feed/ | 섹션(News) | 10 | 유료 |
-| Science (AAAS) | ✅ | https://www.science.org/rss/news_current.xml | 전체 | 10 | 유료 |
-| Scientific American | ✅ | https://www.scientificamerican.com/platform/syndication/rss/ | 전체 | 50 | 무료 |
+| Outlet | RSS | Feed URL | Scope | Items | Body |
+|--------|:---:|----------|-------|------:|:----:|
+| Nature | ✅ | https://www.nature.com/nature.rss | Full | 75 | Paywalled |
+| New Scientist | ✅ | https://www.newscientist.com/section/news/feed/ | Section (News) | 10 | Paywalled |
+| Science (AAAS) | ✅ | https://www.science.org/rss/news_current.xml | Full | 10 | Paywalled |
+| Scientific American | ✅ | https://www.scientificamerican.com/platform/syndication/rss/ | Full | 50 | Free |
 
-## 섹션 피드 넓히기
+## Widening coverage with section feeds
 
-전체 통합 피드가 있더라도 섹션 피드를 함께 제공하는 매체는, 관심 섹션을 각각 소스로 등록해 커버리지를 넓힐 수 있다(패턴은 매체마다 다름):
+Even where a full-site feed exists, an outlet that also offers per-section feeds lets you
+register the sections you care about as separate sources to widen coverage (the pattern
+differs per outlet):
 
 - BBC: `https://feeds.bbci.co.uk/news/<world|business|technology|science_and_environment>/rss.xml`
 - The Guardian: `https://www.theguardian.com/<world|business|technology|science>/rss`
 - New York Times: `https://rss.nytimes.com/services/xml/rss/nyt/<World|Business|Technology|Science>.xml`
-- CNBC: id 기반 섹션 피드(`.../id/<섹션ID>/device/rss/rss.html`)
+- CNBC: id-based section feeds (`.../id/<sectionID>/device/rss/rss.html`)
 - WSJ: `https://feeds.a.dj.com/rss/<RSSWorldNews|RSSMarketsMain|RSSWSJD>.xml`
 
-## 등록 예시
+## Registration examples
 
 ```sh
 newswatcher add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
