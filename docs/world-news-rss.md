@@ -30,14 +30,14 @@ API는 RSS가 아니며 여기 목록과 무관하다.)
 
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
 |------|:---:|----------|------|-------:|:----:|
-| BBC News | ✅ | https://feeds.bbci.co.uk/news/world/rss.xml | 전체 | 38 | 무료 |
-| The Guardian | ✅ | https://www.theguardian.com/world/rss | 전체 | 45 | 무료 |
 | Al Jazeera | ✅ | https://www.aljazeera.com/xml/rss/all.xml | 전체 | 25 | 무료 |
-| Euronews | ✅ | https://www.euronews.com/rss | 전체 | 50 | 무료 |
+| BBC News | ✅ | https://feeds.bbci.co.uk/news/world/rss.xml | 전체 | 38 | 무료 |
 | Deutsche Welle | ✅ | https://rss.dw.com/xml/rss-en-all | 전체 | 135 | 무료 |
+| Euronews | ✅ | https://www.euronews.com/rss | 전체 | 50 | 무료 |
 | France 24 | ✅ | https://www.france24.com/en/france/rss | 섹션 | 30 | 무료 |
-| Reuters | ❌ | — | — | — | — |
+| The Guardian | ✅ | https://www.theguardian.com/world/rss | 전체 | 45 | 무료 |
 | Associated Press | ❌ | — | — | — | — |
+| Reuters | ❌ | — | — | — | — |
 
 Reuters·AP 는 공개 RSS 제공을 중단했다(유료 뉴스 API로 전환). 비공식 서드파티 미러가
 돌아다니지만 안정성·정당성을 보장할 수 없어 등재하지 않는다. 이 두 곳의 기사는 필요하면
@@ -47,48 +47,48 @@ newswatcher `--kind crawl` 어댑터로 붙이거나 Google News 검색 피드�
 
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
 |------|:---:|----------|------|-------:|:----:|
-| The Independent | ✅ | https://www.independent.co.uk/news/world/rss | 전체 | 91 | 무료 |
-| The New York Times | ✅ | https://rss.nytimes.com/services/xml/rss/nyt/World.xml | 섹션(World) | 58 | 유료 |
-| CNN | ✅ | http://rss.cnn.com/rss/edition.rss | 전체 | 50 | 무료 |
-| The Times of India | ✅ | https://timesofindia.indiatimes.com/rssfeedstopstories.cms | 전체 | 47 | 무료 |
-| CBS News | ✅ | https://www.cbsnews.com/latest/rss/world | 섹션(World) | 30 | 무료 |
 | ABC News | ✅ | https://abcnews.go.com/abcnews/topstories | 전체 | 25 | 무료 |
-| The Washington Post | ✅ | https://feeds.washingtonpost.com/rss/world | 섹션(World) | 15 | 유료 |
+| CBS News | ✅ | https://www.cbsnews.com/latest/rss/world | 섹션(World) | 30 | 무료 |
+| CNN | ✅ | http://rss.cnn.com/rss/edition.rss | 전체 | 50 | 무료 |
 | NPR | ✅ | https://feeds.npr.org/1001/rss.xml | 전체 | 10 | 무료 |
 | Sky News | ✅ | https://feeds.skynews.com/feeds/rss/world.xml | 섹션(World) | 8 | 무료 |
+| The Independent | ✅ | https://www.independent.co.uk/news/world/rss | 전체 | 91 | 무료 |
+| The New York Times | ✅ | https://rss.nytimes.com/services/xml/rss/nyt/World.xml | 섹션(World) | 58 | 유료 |
+| The Times of India | ✅ | https://timesofindia.indiatimes.com/rssfeedstopstories.cms | 전체 | 47 | 무료 |
+| The Washington Post | ✅ | https://feeds.washingtonpost.com/rss/world | 섹션(World) | 15 | 유료 |
 
 ## 경제 / 금융
 
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
 |------|:---:|----------|------|-------:|:----:|
-| The Economist | ✅ | https://www.economist.com/finance-and-economics/rss.xml | 섹션 | 300 | 유료 |
-| Yahoo Finance | ✅ | https://finance.yahoo.com/news/rssindex | 전체 | 50 | 무료 |
-| CNBC | ✅ | https://www.cnbc.com/id/100003114/device/rss/rss.html | 섹션 | 30 | 무료 |
-| Forbes | ✅ | https://www.forbes.com/business/feed/ | 섹션 | 25 | 무료 |
 | Bloomberg | ✅ | https://feeds.bloomberg.com/markets/news.rss | 섹션(Markets) | 20 | 유료 |
-| Wall Street Journal | ✅ | https://feeds.a.dj.com/rss/RSSWorldNews.xml | 섹션(World) | 20 | 유료 |
 | Business Insider | ✅ | https://www.businessinsider.com/rss | 전체 | 20 | 무료 |
+| CNBC | ✅ | https://www.cnbc.com/id/100003114/device/rss/rss.html | 섹션 | 30 | 무료 |
 | Financial Times | ✅ | https://www.ft.com/rss/home | 전체 | 10 | 유료 |
-| MarketWatch | ✅ | http://feeds.marketwatch.com/marketwatch/topstories/ | 전체 | 10 | 무료 |
+| Forbes | ✅ | https://www.forbes.com/business/feed/ | 섹션 | 25 | 무료 |
 | Fortune | ✅ | https://fortune.com/feed/ | 전체 | 10 | 유료 |
+| MarketWatch | ✅ | http://feeds.marketwatch.com/marketwatch/topstories/ | 전체 | 10 | 무료 |
+| The Economist | ✅ | https://www.economist.com/finance-and-economics/rss.xml | 섹션 | 300 | 유료 |
+| Wall Street Journal | ✅ | https://feeds.a.dj.com/rss/RSSWorldNews.xml | 섹션(World) | 20 | 유료 |
+| Yahoo Finance | ✅ | https://finance.yahoo.com/news/rssindex | 전체 | 50 | 무료 |
 
 ## 보험 / 재보험 전문
 
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
 |------|:---:|----------|------|-------:|:----:|
-| Insurance Business | ✅ | https://www.insurancebusinessmag.com/us/rss/ | 전체 | 129 | 무료 |
-| Commercial Risk | ✅ | https://www.commercialriskonline.com/feed/ | 전체 | 100 | 무료 |
-| Insurance Journal | ✅ | https://www.insurancejournal.com/feed/ | 전체 | 30 | 무료 |
-| Business Insurance | ✅ | https://www.businessinsurance.com/rss | 전체 | 20 | 유료 |
-| Reinsurance News | ✅ | https://www.reinsurancene.ws/feed/ | 전체 | 10 | 무료 |
 | Artemis (ILS·cat bond) | ✅ | https://www.artemis.bm/feed/ | 전체 | 10 | 무료 |
+| Business Insurance | ✅ | https://www.businessinsurance.com/rss | 전체 | 20 | 유료 |
 | Carrier Management | ✅ | https://www.carriermanagement.com/feed/ | 전체 | 10 | 무료 |
+| Commercial Risk | ✅ | https://www.commercialriskonline.com/feed/ | 전체 | 100 | 무료 |
 | Coverager | ✅ | https://coverager.com/feed/ | 전체 | 10 | 무료 |
 | Digital Insurance | ✅ | https://www.dig-in.com/feed?rss=true | 전체 | 10 | 유료 |
+| Insurance Business | ✅ | https://www.insurancebusinessmag.com/us/rss/ | 전체 | 129 | 무료 |
+| Insurance Journal | ✅ | https://www.insurancejournal.com/feed/ | 전체 | 30 | 무료 |
+| Reinsurance News | ✅ | https://www.reinsurancene.ws/feed/ | 전체 | 10 | 무료 |
 | PropertyCasualty360 | 🔒 | https://www.propertycasualty360.com/feed/ | 전체 | — | 유료 |
+| Insurance Insider | ❌ | — | — | — | — |
 | Intelligent Insurer | ❌ | — | — | — | — |
 | The Insurer | ❌ | — | — | — | — |
-| Insurance Insider | ❌ | — | — | — | — |
 
 재보험 핵심인 **Reinsurance News·Artemis 는 ✅** 로 그대로 `add-source --kind rss` 에 넣으면
 된다. 이 두 곳은 Cloudflare 뒤에 있어 데이터센터 IP + 가짜 브라우저 UA에는 403을 주지만,
@@ -102,27 +102,27 @@ SOA)는 공개 RSS 를 확인하지 못했다(대체로 회원 대상 발행이�
 
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
 |------|:---:|----------|------|-------:|:----:|
-| Finextra | ✅ | https://www.finextra.com/rss/headlines.aspx | 전체 | 57 | 무료 |
-| Seeking Alpha | ✅ | https://seekingalpha.com/feed.xml | 전체 | 30 | 유료 |
-| CoinDesk | ✅ | https://www.coindesk.com/arc/outboundfeeds/rss/ | 전체 | 25 | 무료 |
-| PYMNTS | ✅ | https://www.pymnts.com/feed/ | 전체 | 10 | 무료 |
 | American Banker | ✅ | https://www.americanbanker.com/feed?rss=true | 전체 | 10 | 유료 |
+| CoinDesk | ✅ | https://www.coindesk.com/arc/outboundfeeds/rss/ | 전체 | 25 | 무료 |
+| Finextra | ✅ | https://www.finextra.com/rss/headlines.aspx | 전체 | 57 | 무료 |
 | Investing.com | ✅ | https://www.investing.com/rss/news.rss | 전체 | 10 | 무료 |
-| Pensions & Investments | ❌ | — | — | — | — |
+| PYMNTS | ✅ | https://www.pymnts.com/feed/ | 전체 | 10 | 무료 |
+| Seeking Alpha | ✅ | https://seekingalpha.com/feed.xml | 전체 | 30 | 유료 |
 | Institutional Investor | ❌ | — | — | — | — |
+| Pensions & Investments | ❌ | — | — | — | — |
 | The Banker | ❌ | — | — | — | — |
 
 ## 기술 / IT
 
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
 |------|:---:|----------|------|-------:|:----:|
-| Wired | ✅ | https://www.wired.com/feed/rss | 전체 | 50 | 유료 |
-| TechCrunch | ✅ | https://techcrunch.com/feed/ | 전체 | 20 | 무료 |
 | Ars Technica | ✅ | https://feeds.arstechnica.com/arstechnica/index | 전체 | 20 | 무료 |
 | Engadget | ✅ | https://www.engadget.com/rss.xml | 전체 | 20 | 무료 |
 | Hacker News | ✅ | https://hnrss.org/frontpage | 전체 | 20 | 무료 |
-| The Verge | ✅ | https://www.theverge.com/rss/index.xml | 전체 | 10 | 무료 |
 | MIT Technology Review | ✅ | https://www.technologyreview.com/feed/ | 전체 | 10 | 유료 |
+| TechCrunch | ✅ | https://techcrunch.com/feed/ | 전체 | 20 | 무료 |
+| The Verge | ✅ | https://www.theverge.com/rss/index.xml | 전체 | 10 | 무료 |
+| Wired | ✅ | https://www.wired.com/feed/rss | 전체 | 50 | 유료 |
 | ZDNet | ❌ | — | — | — | — |
 
 ## 과학
@@ -130,9 +130,9 @@ SOA)는 공개 RSS 를 확인하지 못했다(대체로 회원 대상 발행이�
 | 매체 | RSS | 피드 URL | 범위 | 항목수 | 본문 |
 |------|:---:|----------|------|-------:|:----:|
 | Nature | ✅ | https://www.nature.com/nature.rss | 전체 | 75 | 유료 |
-| Scientific American | ✅ | https://www.scientificamerican.com/platform/syndication/rss/ | 전체 | 50 | 무료 |
-| Science (AAAS) | ✅ | https://www.science.org/rss/news_current.xml | 전체 | 10 | 유료 |
 | New Scientist | ✅ | https://www.newscientist.com/section/news/feed/ | 섹션(News) | 10 | 유료 |
+| Science (AAAS) | ✅ | https://www.science.org/rss/news_current.xml | 전체 | 10 | 유료 |
+| Scientific American | ✅ | https://www.scientificamerican.com/platform/syndication/rss/ | 전체 | 50 | 무료 |
 
 ## 섹션 피드 넓히기
 
