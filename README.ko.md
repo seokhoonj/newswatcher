@@ -49,7 +49,7 @@ newswatcher poll
 - `heal [--dry-run] [--provider P] [--model M]` — 매칭이 끊긴 crawl selector를 점검하고 복구합니다.
 - `schedule install|status|remove [--every N]` — 반복 poll을 운영체제 스케줄러에 등록합니다.
 
-## 배달
+## 전송
 
 다이제스트는 이메일, 채팅, 또는 둘 다로 보낼 수 있습니다. 원하는 대상을 하나 이상
 설정합니다.
