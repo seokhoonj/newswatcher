@@ -58,16 +58,19 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 ## Delivery
 
 The digest is sent by email, to a chat channel, or both — set one or both destinations.
-Both channels are handled by companion packages that install alongside newswatcher.
+Both channels are handled by companion packages that install alongside newswatcher, and each
+keeps its own credentials, so newswatcher never stores your email password or bot token.
 
-- Email goes through the mailmail package: `--to ADDRESS` or the `NEWSWATCHER_DIGEST_TO` setting (a
-  mailmail address or address-book alias).
-- Chat goes through the pushpush package: `--push ROUTE` or the `NEWSWATCHER_DIGEST_PUSH` setting,
-  naming a route you configured in pushpush (Telegram, Slack, or Discord). The digest is
+- Email goes through the mailmail package. Set up an account (or an address-book alias) once
+  with mailmail's own CLI (`mailmail --help`); then `--to ADDRESS`, or the
+  `NEWSWATCHER_DIGEST_TO` setting, names that alias or a plain address.
+- Chat goes through the pushpush package. Configure a route (a bot plus its destination —
+  Telegram, Slack, or Discord) once with pushpush's own CLI (`pushpush --help`); then
+  `--push ROUTE`, or the `NEWSWATCHER_DIGEST_PUSH` setting, names that route. The digest is
   sent as one markdown message.
 
-Configure a pushpush route with pushpush's
-own CLI before using `--push`.
+So the only secret newswatcher itself holds is the LLM provider key (below); the email and
+chat credentials live in mailmail and pushpush.
 
 ## News feeds
 

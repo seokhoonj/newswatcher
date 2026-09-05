@@ -57,16 +57,19 @@ newswatcher poll
 ## 전송
 
 다이제스트는 이메일, 채팅, 또는 둘 다로 보낼 수 있습니다. 원하는 대상을 하나 이상
-설정합니다. 두 채널 모두 newswatcher와 함께 설치되는 동반 패키지가 처리합니다.
+설정합니다. 두 채널 모두 newswatcher와 함께 설치되는 동반 패키지가 처리하며, 각자 자기
+자격증명을 관리하므로 newswatcher는 당신의 이메일 비번이나 봇 토큰을 저장하지 않습니다.
 
-- 이메일은 mailmail 패키지로 보냅니다: `--to ADDRESS` 또는 `NEWSWATCHER_DIGEST_TO` 설정
-  (mailmail 주소나 주소록 별칭).
-- 채팅은 pushpush 패키지로 보냅니다: `--push ROUTE` 또는 `NEWSWATCHER_DIGEST_PUSH` 설정으로,
-  pushpush에 미리 설정해 둔 라우트(텔레그램·슬랙·디스코드)를 지정합니다. 다이제스트는
-  markdown 메시지 한 통으로 전송됩니다.
+- 이메일은 mailmail 패키지로 보냅니다. 계정(또는 주소록 별칭)을 mailmail 자체 CLI
+  (`mailmail --help`)로 한 번 설정한 뒤, `--to ADDRESS`(또는 `NEWSWATCHER_DIGEST_TO` 설정)로
+  그 별칭이나 일반 주소를 지정합니다.
+- 채팅은 pushpush 패키지로 보냅니다. 라우트(봇 + 목적지 — 텔레그램·슬랙·디스코드)를
+  pushpush 자체 CLI(`pushpush --help`)로 한 번 설정한 뒤, `--push ROUTE`(또는
+  `NEWSWATCHER_DIGEST_PUSH` 설정)로 그 라우트를 지정합니다. 다이제스트는 markdown 메시지
+  한 통으로 전송됩니다.
 
-`--push`를 쓰기 전에 pushpush 자체 CLI로
-라우트만 설정하면 됩니다.
+즉 newswatcher가 직접 갖는 비밀은 LLM provider 키(아래)뿐이고, 이메일·챗 자격증명은
+mailmail·pushpush에 있습니다.
 
 ## 뉴스 피드
 
