@@ -1,125 +1,292 @@
-import json
-import os
-from pathlib import Path
+"""The channel map that backs ``newswatcher setup`` and ``newswatcher doctor``.
+
+newswatcher owns no secret: these pin that ``channels()`` reports each tool's secret truthfully,
+that a fillable channel stores through its owning tool (never a newswatcher store), that a tool's
+own failure surfaces as a newswatcher ``ConfigError``, and that a lingering pre-0.1 store is
+detected for the one-time migration. The LLM and unconfigured paths run against real tools on the
+suite's tmp config dir; the account/route enumeration is driven with a stubbed tool config.
+"""
+
+import types
 
 import pytest
 
 from newswatcher import credentials
-from newswatcher.errors import ConfigError
+from newswatcher.credentials import ChannelState
+from newswatcher.errors import ConfigError, LLMError
 
 
-def _write_credentials(tmp_path: Path, payload: dict[str, object] | list[object] | str) -> Path:
-    cfg = tmp_path / "newswatcher"
-    cfg.mkdir(parents=True, exist_ok=True)
-    path = cfg / "credentials.json"
-    path.write_text(json.dumps(payload) if not isinstance(payload, str) else payload,
-                    encoding="utf-8")
-    return path
-
-
-def test_secret_from_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, {"GEMINI_API_KEY": "from-file"})
+def _no_provider_key(monkeypatch):
+    """Ensure no Gemini key leaks in from the developer's real environment; the autouse tmp XDG
+    already gives an empty store and no mailmail/pushpush config."""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    assert credentials.secret("GEMINI_API_KEY") == "from-file"
 
 
-def test_env_wins_over_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, {"GEMINI_API_KEY": "from-file"})
-    monkeypatch.setenv("GEMINI_API_KEY", "from-env")
-    assert credentials.secret("GEMINI_API_KEY") == "from-env"
+def test_channels_on_a_fresh_config(monkeypatch):
+    _no_provider_key(monkeypatch)
+    by_tool = {channel.tool: channel for channel in credentials.channels("gemini")}
+    assert by_tool["thinchat"].state is ChannelState.MISSING   # no key yet, but fillable
+    assert by_tool["thinchat"].setter is not None
+    assert by_tool["mailmail"].state is ChannelState.UNCONFIGURED   # no account to fill for
+    assert by_tool["mailmail"].setter is None
+    assert by_tool["pushpush"].state is ChannelState.UNCONFIGURED
 
 
-def test_absent_file_is_no_secret(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    assert credentials.secret("OPENAI_API_KEY") is None
+def test_llm_channel_is_set_after_storing_a_key(monkeypatch):
+    import thinchat
+
+    _no_provider_key(monkeypatch)
+    thinchat.set_api_key("gemini", value="stored")
+    llm = credentials.channels("gemini")[0]
+    assert llm.state is ChannelState.SET
+    assert llm.setter is None
 
 
-def test_absent_key_in_file_is_no_secret(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, {"GEMINI_API_KEY": "g"})
-    monkeypatch.delenv("CLAUDE_API_KEY", raising=False)
-    assert credentials.secret("CLAUDE_API_KEY") is None
+def test_keyless_provider_channel_is_set(monkeypatch):
+    _no_provider_key(monkeypatch)
+    llm = credentials.channels("ollama")[0]
+    assert llm.state is ChannelState.SET
+    assert "keyless" in llm.label
 
 
-def test_empty_value_is_no_secret(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, {"GEMINI_API_KEY": ""})
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    assert credentials.secret("GEMINI_API_KEY") is None
+def test_llm_setter_stores_through_thinchat(monkeypatch):
+    import thinchat
+
+    _no_provider_key(monkeypatch)
+    llm = credentials.channels("gemini")[0]
+    assert llm.state is ChannelState.MISSING
+    assert llm.setter is not None
+    llm.setter("via-setter")
+    resolved = thinchat.get_api_key("gemini")
+    assert resolved is not None and resolved.reveal() == "via-setter"
 
 
-def test_non_json_file_raises(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, "{not json")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    with pytest.raises(ConfigError):
-        credentials.secret("GEMINI_API_KEY")
+def test_unknown_provider_raises_before_touching_a_store(monkeypatch):
+    _no_provider_key(monkeypatch)
+    with pytest.raises(LLMError):
+        credentials.channels("nope")
 
 
-def test_non_utf8_file_raises(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatcher"
-    cfg.mkdir(parents=True, exist_ok=True)
-    (cfg / "credentials.json").write_bytes(b"\xff\xfe not utf-8 bytes")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    with pytest.raises(ConfigError):
-        credentials.secret("GEMINI_API_KEY")
+def test_llm_channel_reports_error_without_leaking_the_store_message(monkeypatch):
+    import thinchat
+    from thinchat.errors import ThinchatError
+
+    _no_provider_key(monkeypatch)
+    secret_ish = "the-key-AIza-xxxx"
+
+    def boom(provider, **kwargs):
+        raise ThinchatError(f"could not read {secret_ish!r}")
+
+    monkeypatch.setattr(thinchat, "get_api_key", boom)
+    llm = credentials.channels("gemini")[0]
+    assert llm.state is ChannelState.ERROR
+    assert llm.setter is None
+    assert secret_ish not in (llm.detail or "")   # the tool's message is never rendered
 
 
-def test_non_object_file_raises(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, [])   # valid JSON, but a list, not a name-to-key map
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    with pytest.raises(ConfigError):
-        credentials.secret("GEMINI_API_KEY")
+def test_legacy_llm_store_detects_a_populated_newswatcher_store(monkeypatch):
+    import credbox
+
+    _no_provider_key(monkeypatch)
+    assert credentials.legacy_llm_store() is None   # nothing stored under newswatcher yet
+    credbox.Credentials("newswatcher").set("GEMINI_API_KEY", value="old-key")
+    location = credentials.legacy_llm_store()
+    assert location is not None and "newswatcher" in location
 
 
-@pytest.mark.parametrize("value", [123, None])
-def test_non_string_value_is_no_secret(monkeypatch, tmp_path, value):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    _write_credentials(tmp_path, {"GEMINI_API_KEY": value})
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    assert credentials.secret("GEMINI_API_KEY") is None
+class _Account:
+    """A stand-in for mailmail's ``SmtpAccount`` -- the two attributes the map reads."""
+
+    def __init__(self, handle: str, email: str) -> None:
+        self.handle = handle
+        self.email = email
 
 
-def test_warns_once_when_credentials_file_is_group_readable(tmp_path, capsys):
-    if os.name != "posix":
-        pytest.skip("POSIX permission bits only")
-    credentials._warned_permissive_paths.clear()
-    p = tmp_path / "credentials.json"
-    p.write_text("{}", encoding="utf-8")
-    os.chmod(p, 0o644)
-    credentials._warn_if_group_or_world_readable(p)
-    assert "chmod 600" in capsys.readouterr().err
-    credentials._warn_if_group_or_world_readable(p)      # warn-once
-    assert capsys.readouterr().err == ""
+def _stub_one_mailmail_account(monkeypatch, *, password_stored: dict[str, str]):
+    """Point mailmail at a single configured account whose password lives in ``password_stored``."""
+    import mailmail
+
+    account = _Account("me", "me@host")
+
+    def resolve(a):
+        if "me" in password_stored:
+            return password_stored["me"]
+        raise mailmail.MissingPasswordError("no password stored")
+
+    monkeypatch.setattr(mailmail, "load_config",
+                        lambda: types.SimpleNamespace(account_by_handle={"me": account}))
+    monkeypatch.setattr(mailmail, "resolve_password", resolve)
 
 
-def test_secret_warns_through_the_public_path_when_group_readable(monkeypatch, tmp_path, capsys):
-    # Prove the warning fires on the real lookup path, not just via the private helper: a
-    # group-readable credentials file read through secret() warns once and still returns.
-    if os.name != "posix":
-        pytest.skip("POSIX permission bits only")
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    credentials._warned_permissive_paths.clear()
-    path = _write_credentials(tmp_path, {"GEMINI_API_KEY": "from-file"})
-    os.chmod(path, 0o644)
-    assert credentials.secret("GEMINI_API_KEY") == "from-file"
-    assert "chmod 600" in capsys.readouterr().err
-    assert credentials.secret("GEMINI_API_KEY") == "from-file"   # warn-once, still returns
-    assert capsys.readouterr().err == ""
+def test_email_channel_enumerates_accounts_and_fills_a_missing_password(monkeypatch):
+    import mailmail
+
+    stored: dict[str, str] = {}
+    _stub_one_mailmail_account(monkeypatch, password_stored=stored)
+    monkeypatch.setattr(mailmail, "store_password",
+                        lambda a, pw: stored.__setitem__("me", pw))
+
+    # provider="ollama" keeps the LLM channel keyless so this exercises only the email path.
+    email = next(c for c in credentials.channels("ollama") if c.tool == "mailmail")
+    assert email.state is ChannelState.MISSING
+    assert email.label == "email me@host"
+    assert email.setter is not None
+    email.setter("smtp-pw")
+    assert stored["me"] == "smtp-pw"
 
 
-def test_no_warning_when_credentials_file_is_0600(tmp_path, capsys):
-    if os.name != "posix":
-        pytest.skip("POSIX permission bits only")
-    credentials._warned_permissive_paths.clear()
-    p = tmp_path / "credentials.json"
-    p.write_text("{}", encoding="utf-8")
-    os.chmod(p, 0o600)
-    credentials._warn_if_group_or_world_readable(p)
-    assert capsys.readouterr().err == ""
+def test_email_setter_translates_a_tool_error_to_configerror(monkeypatch):
+    import mailmail
+
+    _stub_one_mailmail_account(monkeypatch, password_stored={})
+
+    def boom(account, password):
+        raise mailmail.MailmailError("the smtp store is broken")
+
+    monkeypatch.setattr(mailmail, "store_password", boom)
+    email = next(c for c in credentials.channels("ollama") if c.tool == "mailmail")
+    assert email.setter is not None
+    with pytest.raises(ConfigError, match="could not store"):
+        email.setter("smtp-pw")
+
+
+def test_email_channel_is_set_when_the_password_resolves(monkeypatch):
+    _stub_one_mailmail_account(monkeypatch, password_stored={"me": "already-there"})
+    email = next(c for c in credentials.channels("ollama") if c.tool == "mailmail")
+    assert email.state is ChannelState.SET
+    assert email.setter is None
+
+
+def test_email_channel_reports_error_without_leaking_the_store_message(monkeypatch):
+    import mailmail
+
+    account = _Account("me", "me@host")
+    secret_ish = "p@ss w0rd\x01with-a-control-byte"
+
+    def resolve(a):
+        # An unaudited sibling might put the offending value in its error; newswatcher must not
+        # render that text. This message deliberately contains the "secret" to prove it is dropped.
+        raise mailmail.CredentialsError(f"could not read {secret_ish!r}")
+
+    monkeypatch.setattr(mailmail, "load_config",
+                        lambda: types.SimpleNamespace(account_by_handle={"me": account}))
+    monkeypatch.setattr(mailmail, "resolve_password", resolve)
+    email = next(c for c in credentials.channels("ollama") if c.tool == "mailmail")
+    assert email.state is ChannelState.ERROR
+    assert email.setter is None
+    assert secret_ish not in (email.detail or "")   # the tool's message is never rendered
+
+
+def test_email_unconfigured_when_the_config_is_absent(monkeypatch):
+    import mailmail
+
+    def absent():
+        raise mailmail.ConfigError("no configuration file") from FileNotFoundError()
+
+    monkeypatch.setattr(mailmail, "load_config", absent)
+    email = next(c for c in credentials.channels("ollama") if c.tool == "mailmail")
+    assert email.state is ChannelState.UNCONFIGURED   # nothing configured yet -> not counted
+
+
+def test_email_reports_error_when_the_config_is_corrupt(monkeypatch):
+    import mailmail
+
+    def corrupt():
+        # A parse failure chains a non-FileNotFoundError cause; this must be ERROR (which doctor
+        # counts), not the "no account" UNCONFIGURED that would let a scheduled gate pass.
+        raise mailmail.ConfigError("not valid TOML") from ValueError("bad toml at line 3")
+
+    monkeypatch.setattr(mailmail, "load_config", corrupt)
+    email = next(c for c in credentials.channels("ollama") if c.tool == "mailmail")
+    assert email.state is ChannelState.ERROR
+    assert email.setter is None
+
+
+def test_chat_reports_error_when_the_config_is_corrupt(monkeypatch):
+    import pushpush
+
+    def corrupt():
+        raise pushpush.ConfigError("not valid TOML") from ValueError("bad toml")
+
+    monkeypatch.setattr(pushpush, "load_config", corrupt)
+    chat = next(c for c in credentials.channels("ollama") if c.tool == "pushpush")
+    assert chat.state is ChannelState.ERROR
+    assert chat.setter is None
+
+
+class _Route:
+    """A stand-in for pushpush's ``Route`` -- the one attribute the map reads."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+def _stub_one_pushpush_route(monkeypatch, *, secret_stored: dict[str, str]):
+    """Point pushpush at a single configured route whose token lives in ``secret_stored``."""
+    import pushpush
+
+    route = _Route("alerts")
+
+    def resolve(r):
+        if "alerts" in secret_stored:
+            return secret_stored["alerts"]
+        raise pushpush.MissingSecretError("no secret stored")
+
+    monkeypatch.setattr(pushpush, "load_config",
+                        lambda: types.SimpleNamespace(route_by_name={"alerts": route}))
+    monkeypatch.setattr(pushpush, "resolve_secret", resolve)
+
+
+def test_chat_channel_is_set_when_the_token_resolves(monkeypatch):
+    _stub_one_pushpush_route(monkeypatch, secret_stored={"alerts": "bot-token"})
+    chat = next(c for c in credentials.channels("ollama") if c.tool == "pushpush")
+    assert chat.state is ChannelState.SET
+    assert chat.label == "chat alerts"
+    assert chat.setter is None
+
+
+def test_chat_channel_fills_a_missing_token(monkeypatch):
+    import pushpush
+
+    stored: dict[str, str] = {}
+    _stub_one_pushpush_route(monkeypatch, secret_stored=stored)
+    monkeypatch.setattr(pushpush, "store_secret",
+                        lambda r, secret: stored.__setitem__("alerts", secret))
+    chat = next(c for c in credentials.channels("ollama") if c.tool == "pushpush")
+    assert chat.state is ChannelState.MISSING
+    assert chat.setter is not None
+    chat.setter("bot-token")
+    assert stored["alerts"] == "bot-token"
+
+
+def test_chat_channel_reports_error_without_leaking_the_store_message(monkeypatch):
+    import pushpush
+
+    route = _Route("alerts")
+    secret_ish = "xoxb-secret\x01token"
+
+    def resolve(r):
+        raise pushpush.CredentialsError(f"could not read {secret_ish!r}")
+
+    monkeypatch.setattr(pushpush, "load_config",
+                        lambda: types.SimpleNamespace(route_by_name={"alerts": route}))
+    monkeypatch.setattr(pushpush, "resolve_secret", resolve)
+    chat = next(c for c in credentials.channels("ollama") if c.tool == "pushpush")
+    assert chat.state is ChannelState.ERROR
+    assert chat.setter is None
+    assert secret_ish not in (chat.detail or "")
+
+
+def test_chat_setter_translates_a_tool_error_to_configerror(monkeypatch):
+    import pushpush
+
+    _stub_one_pushpush_route(monkeypatch, secret_stored={})
+
+    def boom(route, secret):
+        raise pushpush.PushpushError("the chat store is broken")
+
+    monkeypatch.setattr(pushpush, "store_secret", boom)
+    chat = next(c for c in credentials.channels("ollama") if c.tool == "pushpush")
+    assert chat.setter is not None
+    with pytest.raises(ConfigError, match="could not store"):
+        chat.setter("bot-token")

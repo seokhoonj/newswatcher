@@ -17,7 +17,7 @@ from pathlib import Path
 import requests
 from thinchat.errors import ThinchatError
 
-from newswatcher._llm import DEFAULT_PROVIDER, make_llm_client, scrub_exception, scrub_secrets
+from newswatcher._llm import DEFAULT_PROVIDER, make_llm_client
 from newswatcher.crawl import extract_items
 from newswatcher.errors import HealError, NewswatcherError, SourceError
 from newswatcher.http import get
@@ -136,9 +136,9 @@ def propose_selectors(
         try:
             reply = client.complete(_truncate(html), system=_SYSTEM).strip()
         except ThinchatError as err:
-            raise HealError(
-                f"selector proposal failed: {scrub_secrets(str(err), extra_key=api_key)}"
-            ) from scrub_exception(err, extra_key=api_key)
+            # thinchat scrubs any provider key from its own error and the chain beneath it, so
+            # the message is safe to interpolate as-is.
+            raise HealError(f"selector proposal failed: {err}") from err
     return _parse_selectors(reply)
 
 

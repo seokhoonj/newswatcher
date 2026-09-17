@@ -5,213 +5,99 @@ import newswatcher._llm as _llm
 from newswatcher.errors import LLMError
 
 
-def test_scrub_secrets_redacts_resolvable_key(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")
-    scrubbed = _llm.scrub_secrets("HTTP 401 at https://api/v1?key=SECRET-KEY-123 rejected")
-    assert "SECRET-KEY-123" not in scrubbed
-    assert "***" in scrubbed
+class _FakeSecret:
+    """A stand-in for thinchat's ``Secret``: reveals a plaintext, and is what the resolver returns.
+    newswatcher's ``_llm`` only calls ``.reveal()`` on it."""
+
+    def __init__(self, value: str) -> None:
+        self._value = value
+
+    def reveal(self) -> str:
+        return self._value
 
 
-def test_make_llm_client_construction_error_hides_key(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")
-
-    def boom(*args, **kwargs):
-        raise ThinchatError("cannot initialise client with key SECRET-KEY-123")
-
-    monkeypatch.setattr(_llm, "make_client", boom)
-    with pytest.raises(LLMError) as excinfo:
-        _llm.make_llm_client(max_tokens=100, action="summarizing")
-    assert "SECRET-KEY-123" not in str(excinfo.value)
-    # The chained cause must also be scrubbed: logging.exception formats the whole
-    # __cause__/__context__ chain, so a raw key there defeats the redaction.
-    assert "SECRET-KEY-123" not in str(excinfo.value.__cause__)
-
-
-def test_make_llm_client_hides_an_explicitly_passed_key(monkeypatch, tmp_path):
-    # An api_key given in code is not in the env or credentials file, so scrub_secrets
-    # cannot resolve it -- it must still be scrubbed from the message and the cause.
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
-    def boom(*args, **kwargs):
-        raise ThinchatError("auth failed for key EXPLICIT-KEY-999")
-
-    monkeypatch.setattr(_llm, "make_client", boom)
-    with pytest.raises(LLMError) as excinfo:
-        _llm.make_llm_client(api_key="EXPLICIT-KEY-999", max_tokens=100, action="summarizing")
-    assert "EXPLICIT-KEY-999" not in str(excinfo.value)
-    assert "EXPLICIT-KEY-999" not in str(excinfo.value.__cause__)
-
-
-def test_scrub_exception_scrubs_the_whole_cause_chain(monkeypatch, tmp_path):
-    import traceback
-    secret = "SECRET-KEY-123"
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.setenv("GEMINI_API_KEY", secret)
-    # Build the key-bearing message from a variable so the *source line* the traceback
-    # echoes does not itself contain the literal (that would be a test artifact, not a
-    # scrub failure). A 3-deep chain with the key ONLY in the deepest link, reached via
-    # both an implicit context (__context__) and an explicit cause (__cause__).
-    deepest = f"GET https://api?key={secret} refused"
-    try:
-        try:
-            try:
-                raise OSError(deepest)
-            except OSError:
-                raise ValueError("transport failed")  # noqa: B904  # implicit __context__ is the point
-        except ValueError as mid:
-            raise ThinchatError("provider call failed") from mid   # explicit __cause__
-    except ThinchatError as err:
-        scrubbed = _llm.scrub_exception(err)
-    # Assert against the actual rendered traceback, the real leak surface, not a re-walk.
-    formatted = "".join(traceback.format_exception(scrubbed))
-    assert secret not in formatted
-
-
-def test_make_llm_client_uses_credentials_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatcher"
-    cfg.mkdir(parents=True)
-    (cfg / "credentials.json").write_text('{"GEMINI_API_KEY": "file-key"}', encoding="utf-8")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
+def _stub_thinchat(monkeypatch, *, resolved):
+    """Patch thinchat's resolver and client constructor (as ``_llm`` imported them) so a test drives
+    ``make_llm_client`` without a store or a network. ``resolved`` is what the resolver returns when
+    no override is given (a ``_FakeSecret`` or ``None``); an override always wins, as thinchat does
+    it. Returns the dict the fake client records its ``provider`` / ``api_key`` in."""
     captured: dict[str, object] = {}
+
+    def fake_get_api_key(provider, *, override=None):
+        return _FakeSecret(override) if override is not None else resolved
 
     def fake_make_client(provider, *, model, api_key, max_tokens, max_retries):
         captured["provider"] = provider
         captured["api_key"] = api_key
         return object()
 
+    monkeypatch.setattr(_llm, "get_api_key", fake_get_api_key)
     monkeypatch.setattr(_llm, "make_client", fake_make_client)
+    return captured
+
+
+def test_make_llm_client_uses_thinchats_resolved_key(monkeypatch):
+    captured = _stub_thinchat(monkeypatch, resolved=_FakeSecret("stored-key"))
     _llm.make_llm_client(max_tokens=100, action="summarizing")
     assert captured["provider"] == "gemini"
-    assert captured["api_key"] == "file-key"
+    assert captured["api_key"] == "stored-key"
 
 
-def test_make_llm_client_explicit_key_wins_over_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatcher"
-    cfg.mkdir(parents=True)
-    (cfg / "credentials.json").write_text('{"GEMINI_API_KEY": "file-key"}', encoding="utf-8")
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-
-    captured: dict[str, object] = {}
-    monkeypatch.setattr(
-        _llm, "make_client",
-        lambda provider, *, model, api_key, max_tokens, max_retries: captured.setdefault("api_key", api_key),
-    )
+def test_make_llm_client_explicit_key_wins(monkeypatch):
+    # An explicit override wins over whatever thinchat would otherwise resolve.
+    captured = _stub_thinchat(monkeypatch, resolved=_FakeSecret("stored-key"))
     _llm.make_llm_client(api_key="explicit", max_tokens=100, action="summarizing")
     assert captured["api_key"] == "explicit"
 
 
-def test_make_llm_client_env_key_wins_over_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    cfg = tmp_path / "newswatcher"
-    cfg.mkdir(parents=True)
-    (cfg / "credentials.json").write_text('{"GEMINI_API_KEY": "file-key"}', encoding="utf-8")
-    monkeypatch.setenv("GEMINI_API_KEY", "env-key")
-
-    captured: dict[str, object] = {}
-    monkeypatch.setattr(
-        _llm, "make_client",
-        lambda provider, *, model, api_key, max_tokens, max_retries: captured.setdefault("api_key", api_key),
-    )
-    _llm.make_llm_client(max_tokens=100, action="summarizing")
-    assert captured["api_key"] == "env-key"
-
-
-def test_make_llm_client_ollama_needs_no_key(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    # ollama has no entry in ENV_BY_PROVIDER, so no key is required or looked up
-    captured: dict[str, object] = {}
-    monkeypatch.setattr(
-        _llm, "make_client",
-        lambda provider, *, model, api_key, max_tokens, max_retries: captured.setdefault("api_key", api_key),
-    )
+def test_make_llm_client_ollama_needs_no_key(monkeypatch):
+    # ollama is keyless: _llm never asks the resolver, and hands the client api_key=None.
+    captured = _stub_thinchat(monkeypatch, resolved=None)
     _llm.make_llm_client(provider="ollama", max_tokens=100, action="summarizing")
     assert captured["api_key"] is None
 
 
-def test_make_llm_client_missing_key_raises(monkeypatch, tmp_path):
-    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    with pytest.raises(LLMError):
+def test_make_llm_client_missing_key_raises(monkeypatch):
+    _stub_thinchat(monkeypatch, resolved=None)
+    with pytest.raises(LLMError, match="needs an API key"):
         _llm.make_llm_client(max_tokens=100, action="summarizing")
 
 
-def test_scrub_exception_redacts_a_url_attribute():
-    class _Transport(Exception):
-        url: str
-
-    e = _Transport("call failed")
-    e.url = "https://generativelanguage.googleapis.com/v1?key=SECRET-KEY-123"
-    _llm.scrub_exception(e, extra_key="SECRET-KEY-123")
-    scrubbed = e.url
-    assert "SECRET-KEY-123" not in scrubbed and "***" in scrubbed
+def test_make_llm_client_unknown_provider_raises(monkeypatch):
+    with pytest.raises(LLMError):
+        _llm.make_llm_client(provider="nope", max_tokens=100, action="summarizing")
 
 
-def test_scrub_exception_redacts_request_and_response_urls():
-    # A transport error carries the key not only on its own .url but on the .request and
-    # .response objects it attaches; the scrubber must reach both, since a traceback can
-    # render either.
-    secret = "SECRET-KEY-123"
+def test_make_llm_client_unreadable_store_becomes_llmerror(monkeypatch):
+    # thinchat's resolver failing (a malformed store binding, an unreadable file) surfaces as a
+    # newswatcher LLMError naming the action -- a foreign ThinchatError never escapes.
+    def boom(provider, *, override=None):
+        raise ThinchatError("store could not be read")
 
-    class _Endpoint:
-        def __init__(self, url: str) -> None:
-            self.url = url
-
-    class _Transport(Exception):
-        pass
-
-    err = _Transport("call failed")
-    err.request = _Endpoint(f"https://api?key={secret}")   # type: ignore[attr-defined]
-    err.response = _Endpoint(f"https://api/retry?key={secret}")   # type: ignore[attr-defined]
-    _llm.scrub_exception(err, extra_key=secret)
-    assert secret not in err.request.url and "***" in err.request.url   # type: ignore[attr-defined]
-    assert secret not in err.response.url and "***" in err.response.url   # type: ignore[attr-defined]
+    monkeypatch.setattr(_llm, "get_api_key", boom)
+    with pytest.raises(LLMError, match="could not read the stored key"):
+        _llm.make_llm_client(max_tokens=100, action="summarizing")
 
 
-def test_scrub_exception_survives_a_raising_url_property():
-    # httpx spells .request / .url as properties that raise (not return None) when unset;
-    # a cause-chain link like that must not turn the scrubber -- which runs on the error
-    # path -- into a crash that masks the error it was cleaning.
-    class _RaisingTransport(Exception):
-        @property
-        def request(self):
-            raise RuntimeError("the .request property has not been set")
+def test_error_never_carries_the_resolved_key(monkeypatch):
+    # newswatcher reveals the plaintext key to hand to the client; this pins that newswatcher's own
+    # error composition never surfaces it. The stubbed ThinchatError is contract-compliant (thinchat
+    # scrubs its own errors), so this asserts newswatcher's surface only, and re-scrubs nothing.
+    def boom(provider, *, model, api_key, max_tokens, max_retries):
+        raise ThinchatError("provider rejected the request")   # a real one carries no key
 
-        @property
-        def url(self):
-            raise RuntimeError("the .url property has not been set")
-
-    top = LLMError("provider call failed")
-    try:
-        raise _RaisingTransport("transport failed")
-    except _RaisingTransport as cause:
-        top.__cause__ = cause
-    # Must return the original error rather than propagating the property's RuntimeError.
-    assert _llm.scrub_exception(top, extra_key="SECRET-KEY-123") is top
+    monkeypatch.setattr(_llm, "get_api_key", lambda p, *, override=None: _FakeSecret("file-key"))
+    monkeypatch.setattr(_llm, "make_client", boom)
+    with pytest.raises(LLMError) as excinfo:
+        _llm.make_llm_client(max_tokens=100, action="summarizing")
+    surfaces = []
+    err: BaseException | None = excinfo.value
+    while err is not None:
+        surfaces.append(str(err))
+        err = err.__cause__
+    assert all("file-key" not in text for text in surfaces)
 
 
-def test_scrub_exception_survives_a_raising_args_or_cause():
-    # A best-effort scrubber on the error path must never raise, even for a pathological
-    # exception subclass whose args or __cause__/__context__ is itself a raising property.
-    class _RaisingArgs(Exception):
-        @property
-        def args(self):
-            raise RuntimeError("args read failed")
-
-        @args.setter
-        def args(self, value):
-            raise RuntimeError("args write failed")
-
-    class _RaisingCause(Exception):
-        @property
-        def __cause__(self):  # type: ignore[override]  # deliberately raises on read
-            raise RuntimeError("cause read failed")
-
-    assert _llm.scrub_exception(_RaisingArgs("boom")) is not None
-    err = _RaisingCause("boom")
-    assert _llm.scrub_exception(err) is err
+def test_provider_key_name_maps_known_and_keyless():
+    assert _llm.provider_key_name("gemini") == "GEMINI_API_KEY"
+    assert _llm.provider_key_name("ollama") is None

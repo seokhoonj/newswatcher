@@ -12,13 +12,17 @@ from __future__ import annotations
 
 import argparse
 import functools
+import getpass
 import sys
 import time
 
-from newswatcher import __version__, config
-from newswatcher._llm import DEFAULT_PROVIDER, validate_provider
+import thinchat
+
+from newswatcher import __version__, config, credentials
+from newswatcher._llm import DEFAULT_PROVIDER, provider_key_name, validate_provider
+from newswatcher.credentials import ChannelState
 from newswatcher.digest import send_digest
-from newswatcher.errors import ArchiveError, ConfigError, NewswatcherError
+from newswatcher.errors import ArchiveError, ConfigError, LLMError, NewswatcherError
 from newswatcher.feed import parse_feed
 from newswatcher.heal import heal_empty_sources, heal_source
 from newswatcher.http import default_gate, get, new_session
@@ -304,6 +308,125 @@ def _run_heal(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_set_key(args: argparse.Namespace) -> int:
+    """Store an LLM provider's API key with thinchat (prompted without echo, written at mode 0600).
+    The key value is never printed. ``setup`` writes the key to the same place; this is the
+    key-only command for a user who does not need the full setup pass."""
+    provider = args.provider
+    validate_provider(provider)   # reject a typo before prompting for the key
+    if provider_key_name(provider) is None:
+        raise LLMError(f"{provider} runs locally and needs no API key")
+    api_key = _prompt_secret(f"{provider} API key: ")
+    if api_key is None:
+        return 2
+    try:
+        thinchat.set_api_key(provider, value=api_key)
+    except thinchat.ThinchatError as err:
+        raise LLMError(f"could not store the {provider} API key: {err}") from err
+    print(f"stored the {provider} API key with thinchat")
+    return 0
+
+
+def _run_setup(args: argparse.Namespace) -> int:
+    """Fill in the missing secrets for the channels newswatcher drives -- the LLM key with thinchat,
+    each email password with mailmail, each chat token with pushpush -- prompting without echo and
+    printing where each landed. A secret is stored with its owning tool, not with newswatcher, which
+    keeps none. A channel whose config entity does not exist yet is pointed at its tool; a store that
+    cannot be written is reported and the next channel still runs. No secret value is printed."""
+    provider = args.provider or config.setting(_LLM_PROVIDER_ENV) or DEFAULT_PROVIDER
+    _offer_legacy_migration()
+    n_stored = n_failed = 0
+    for channel in credentials.channels(provider):
+        if channel.state is ChannelState.SET:
+            print(f"  {channel.label}: already set ({channel.location})")
+        elif channel.state is ChannelState.UNCONFIGURED:
+            print(f"  {channel.label}: {channel.detail}")
+        elif channel.state is ChannelState.ERROR:
+            print(f"  {channel.label}: store unreadable -- {channel.detail}", file=sys.stderr)
+            n_failed += 1
+        elif channel.state is ChannelState.MISSING:   # the entity exists, the secret does not
+            setter = channel.setter
+            if setter is None:   # Channel enforces MISSING => setter present; guard anyway
+                print(f"  {channel.label}: no way to store it", file=sys.stderr)
+                n_failed += 1
+                continue
+            value = _prompt_secret(f"  {channel.label} ({channel.tool}): ")
+            if value is None:
+                print(f"  {channel.label}: skipped", file=sys.stderr)
+                continue
+            try:
+                setter(value)
+            except NewswatcherError as err:
+                print(f"  {channel.label}: {err}", file=sys.stderr)
+                n_failed += 1
+                continue
+            print(f"  {channel.label}: stored ({channel.location})")
+            n_stored += 1
+        else:   # ChannelState is a closed enum; fail loud if a future member slips through
+            raise AssertionError(f"unhandled channel state {channel.state}")
+    print(f"setup: {n_stored} stored, {n_failed} failed")
+    return 1 if n_failed else 0
+
+
+def _run_doctor(args: argparse.Namespace) -> int:
+    """Report each channel's secret status and its store path, plus the newswatcher config files.
+    Never prints a secret. Exits non-zero when a configured channel is missing its secret or its
+    store is unreadable, so a scheduled run can gate on a complete setup."""
+    provider = args.provider or config.setting(_LLM_PROVIDER_ENV) or DEFAULT_PROVIDER
+    print("credentials")
+    n_unhealthy = 0
+    for channel in credentials.channels(provider):
+        line = f"  {channel.label:<26} {_MARK_BY_STATE[channel.state]:<9} {channel.location}"
+        if channel.state is ChannelState.MISSING:
+            line += "  (run: newswatcher setup)"
+        elif channel.detail:   # UNCONFIGURED hint or ERROR text
+            line += f"  ({channel.detail})"
+        print(line)
+        if channel.state in (ChannelState.MISSING, ChannelState.ERROR):
+            n_unhealthy += 1
+    print("config")
+    for name in ("config.toml", "sources.toml", "topics.toml"):
+        path = config.config_dir() / name
+        mark = "present" if path.exists() else "absent"
+        print(f"  {name:<26} {mark:<9} {credentials.display_path(path)}")
+    return 1 if n_unhealthy else 0
+
+
+def _offer_legacy_migration() -> None:
+    """When a populated pre-0.1 newswatcher LLM store still exists, print the one-time
+    ``credbox migrate`` that moves its keys to thinchat's store (the key names already match).
+    newswatcher no longer reads its own store, so this is guidance, not an automatic move."""
+    legacy = credentials.legacy_llm_store()
+    if legacy is not None:
+        print(f"note: an old LLM store lingers at {legacy}; "
+              f"newswatcher now reads the key from thinchat. Move it once with:")
+        print("  credbox migrate --from-app newswatcher --to-app thinchat --remove-source")
+
+
+def _prompt_secret(label: str) -> str | None:
+    """Prompt for a secret without echoing it, returning the stripped value or ``None`` when nothing
+    was entered (an empty line or a closed stdin) -- the caller decides what an absent value means.
+    The value is never printed."""
+    try:
+        entered = getpass.getpass(label)
+    except EOFError:
+        print("newswatcher: no value provided (stdin closed)", file=sys.stderr)
+        return None
+    value = entered.strip()
+    if not value:
+        print("newswatcher: no value provided", file=sys.stderr)
+        return None
+    return value
+
+
+_MARK_BY_STATE = {
+    ChannelState.SET: "set",
+    ChannelState.MISSING: "not set",
+    ChannelState.UNCONFIGURED: "no config",
+    ChannelState.ERROR: "error",
+}
+
+
 def _run_schedule(args: argparse.Namespace) -> int:
     if args.action == "install":
         every = args.every if args.every is not None else DEFAULT_INTERVAL_MINUTES
@@ -376,6 +499,21 @@ def _build_parser() -> argparse.ArgumentParser:
     heal.add_argument("--dry-run", action="store_true", dest="dry_run")
     _add_llm_flags(heal)
     heal.set_defaults(run=_run_heal)
+
+    set_key = sub.add_parser("set-key", help="store an LLM provider API key (prompted, no echo)")
+    set_key.add_argument("provider",
+                         help=f"the provider name (e.g. {DEFAULT_PROVIDER}, openai, claude)")
+    set_key.set_defaults(run=_run_set_key)
+
+    setup = sub.add_parser("setup", help="fill in the missing secrets for each channel (guided)")
+    setup.add_argument("--provider", default=None,
+                       help=f"the LLM provider to set up (default: {DEFAULT_PROVIDER} or the setting)")
+    setup.set_defaults(run=_run_setup)
+
+    doctor = sub.add_parser("doctor", help="show where each secret and config file lives, and what is set")
+    doctor.add_argument("--provider", default=None,
+                        help=f"the LLM provider to report (default: {DEFAULT_PROVIDER} or the setting)")
+    doctor.set_defaults(run=_run_doctor)
 
     schedule = sub.add_parser("schedule", help="register the recurring poll with the OS scheduler")
     schedule.add_argument("action", choices=("install", "remove", "status"))
