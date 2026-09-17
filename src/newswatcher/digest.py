@@ -10,12 +10,16 @@ on that channel happens."""
 
 from __future__ import annotations
 
-from typing import Protocol, cast
+from html import escape
+from typing import TYPE_CHECKING, Protocol, cast
 
 from newswatcher.errors import DigestError
 from newswatcher.stories import Story
 
-__all__ = ["render_digest", "send_digest"]
+if TYPE_CHECKING:
+    from mailmail import HTMLLayout
+
+__all__ = ["render_digest", "render_html_digest", "send_digest"]
 
 _DIVIDER = "─" * 24
 
@@ -23,7 +27,8 @@ _DIVIDER = "─" * 24
 class _MailmailModule(Protocol):
     MailmailError: type[Exception]
 
-    def send(self, *, subject: str, body: str, to: str, account: str | None = ...) -> object: ...
+    def send(self, *, subject: str, body: str, to: str, html: str | None = ...,
+             account: str | None = ...) -> object: ...
 
 
 class _PushpushModule(Protocol):
@@ -48,6 +53,48 @@ def render_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...] = (
         body += ("\n\n" + _DIVIDER + "\nselector repairs:\n"
                  + "\n".join(f"- {note}" for note in heal_notes))
     return subject, body
+
+
+def render_html_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...] = ()) -> str:
+    """Render the digest as a standalone HTML document for an email body, built with mailmail's
+    themed ``HTMLLayout`` -- so the digest wears the same house style mailmail gives every
+    message. Stories are grouped by topic exactly as ``render_digest``; each entry is the lead's
+    linked title, our summary, and the outlets that ran the same story. This is the email path
+    only: chat carries no HTML (the plain-text body holds the same content)."""
+    from mailmail import HTMLLayout
+
+    layout = HTMLLayout()
+    parts = [layout.header(eyebrow="newswatcher", title=_headline(len(stories)))]
+    if not stories:
+        parts.append(layout.para_row(escape("No new articles this run.")))
+    else:
+        for topic, group in _group_by_topic(stories):
+            parts.append(layout.section(f"{topic} ({len(group)})"))
+            parts.extend(layout.para_row(_story_html(layout, story)) for story in group)
+    if heal_notes:
+        parts.append(layout.section("selector repairs"))
+        parts.append(layout.para_row("<br>".join(escape(note) for note in heal_notes)))
+    return layout.render_page(parts)
+
+
+def _headline(count: int) -> str:
+    """The digest's one-line count, e.g. ``"3 new stories"`` -- the header title (the eyebrow
+    already carries the newswatcher name)."""
+    return f"{count} new stor{'y' if count == 1 else 'ies'}"
+
+
+def _story_html(layout: HTMLLayout, story: Story) -> str:
+    """One story as an HTML paragraph fragment: the lead's linked title, its summary, and --
+    when other outlets ran the same story -- who else did. Article text is escaped; the layout's
+    own theme colors the title link."""
+    lead = story.lead
+    title = (f'<a href="{escape(lead.link, quote=True)}" '
+             f'style="color:{layout.theme.heading_color};font-weight:700;'
+             f'text-decoration:none;">{escape(lead.title)}</a>')
+    lines = [title, escape(lead.summary)]
+    if story.duplicates:
+        lines.append("also reported by: " + escape(", ".join(story.also_reported_by)))
+    return "<br>".join(lines)
 
 
 def send_digest(
@@ -78,7 +125,7 @@ def send_digest(
     delivered = 0
     if email_to:
         try:
-            _send_email(subject, body, to=email_to, account=account)
+            _send_email(subject, body, stories, heal_notes, to=email_to, account=account)
             delivered += 1
         except DigestError as err:
             failures.append(str(err))
@@ -93,10 +140,12 @@ def send_digest(
     return tuple(failures)
 
 
-def _send_email(subject: str, body: str, *, to: str, account: str | None) -> None:
+def _send_email(subject: str, body: str, stories: tuple[Story, ...],
+                heal_notes: tuple[str, ...], *, to: str, account: str | None) -> None:
     mailmail = _load_mailmail()
+    html = render_html_digest(stories, heal_notes=heal_notes)   # the rich body; body is the text fallback
     try:
-        mailmail.send(subject=subject, body=body, to=to, account=account)
+        mailmail.send(subject=subject, body=body, to=to, html=html, account=account)
     except mailmail.MailmailError as err:
         raise DigestError(f"could not send digest email: {err}") from err
     except OSError as err:
