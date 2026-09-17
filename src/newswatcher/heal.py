@@ -74,7 +74,12 @@ def heal_source(
 
     Raises:
         FetchError: the listing could not be fetched (propagated).
+        LLMError: the provider is unknown, no API key is available, or the client could not be
+            built (propagated from ``propose_selectors``).
         HealError: the LLM proposal could not be obtained or parsed.
+        SourceError: the source's own existing selector is malformed (the health check cannot
+            run), or the repaired selectors could not be written -- propagated from
+            ``extract_items`` or ``update_selectors``.
     """
     html = _fetch_listing(source, gate, session)
     if extract_items(html, source):
@@ -129,6 +134,8 @@ def propose_selectors(
     a non-string is dropped, so callers read it with ``.get``).
 
     Raises:
+        LLMError: the provider is unknown, no API key is available, or the client could not be
+            built (propagated from ``make_llm_client``).
         HealError: the call failed or the reply was not the expected JSON object.
     """
     with make_llm_client(provider, model=model, api_key=api_key,
