@@ -48,6 +48,9 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 | `topics` | List the defined topics with their include / exclude keywords. |
 | `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | Register a source — an RSS feed (`--kind rss`) or a robots-permitted crawl page (`--kind crawl`) — and the `--topic`s to test it against. A crawl source also needs selectors: `--item --title --link` (required), `--date --body-selector` (optional). `--keep-all` keeps every article from the source without keyword filtering (for a trade feed that is wholly on-topic). |
 | `sources` | List the registered sources with their kind, URL, and topics. |
+| `set-key <provider>` | Store an LLM provider's API key with thinchat, prompted without echo (mode 0600). The provider is `gemini`, `openai`, or `claude`; the key is also read from the matching `*_API_KEY` environment variable, which takes precedence. |
+| `setup [--provider P]` | Fill in the missing secrets for every channel in one guided pass — the LLM key with thinchat, each email password with mailmail, each chat token with pushpush — prompting without echo and printing where each landed. Skips what is already set, and points you at the tool to configure a channel that has no account or route yet. |
+| `doctor [--provider P]` | Show where each secret and config file lives and whether it is set, without printing any secret. Exits non-zero when a configured channel is missing its secret or its store is unreadable, so a scheduled run can gate on a complete setup. |
 | `recent <url> [--limit N]` | Fetch and print a feed's latest items (title + link) without storing or summarizing — a quick check of a URL before you register it. `--limit N` caps how many. |
 | `poll` | Run one pass: fetch every source, keep the new articles that match a topic, summarize them, archive them, and send the digest. `--to` / `--push` set destinations; `--no-mail` collects without sending; `--no-store` skips archiving; `--no-heal` skips selector repair; `--provider` / `--model` choose the LLM. |
 | `watch [--every N]` | Run `poll` repeatedly in the foreground, every `--every` minutes (default 30), until you stop it. Takes all of `poll`'s options. |
@@ -69,8 +72,10 @@ keeps its own credentials, so newswatcher never stores your email password or bo
   `--push ROUTE`, or the `NEWSWATCHER_DIGEST_PUSH` setting, names that route. The digest is
   sent as one markdown message.
 
-So the only secret newswatcher itself holds is the LLM provider key (below); the email and
-chat credentials live in mailmail and pushpush.
+So newswatcher holds no secret of its own: the LLM key lives with thinchat, the email password
+with mailmail, the chat token with pushpush — each in its own store, exactly as when the tool is
+used on its own. Configure them all in one guided pass with `newswatcher setup`, and see the full
+map — what is set and where it lives — with `newswatcher doctor`.
 
 ## News feeds
 
@@ -173,20 +178,19 @@ deliberately).
 
 ## Provider keys and model
 
-An LLM provider key is a secret, so it lives apart from the settings, in
-`credentials.json` under the same config directory — a flat JSON map keyed by the
-provider's standard environment-variable name:
+The LLM provider key is a secret, and it lives with thinchat — the library newswatcher
+summarizes through — not with newswatcher. Store it once with `setup` (which configures
+email and chat in the same pass) or with `set-key` for the key alone; both prompt without
+echoing and write to thinchat's store (mode 0600):
 
-```json
-{
-  "GEMINI_API_KEY": "...",
-  "OPENAI_API_KEY": "...",
-  "CLAUDE_API_KEY": "..."
-}
+```sh
+newswatcher setup            # the LLM key, plus email and chat, in one pass
+newswatcher set-key gemini   # just the LLM key
 ```
 
-Each key is also read from that same environment variable, which takes precedence,
-so a one-off run can supply a key without editing the file.
+Each key is also read from its standard environment variable (`GEMINI_API_KEY`,
+`OPENAI_API_KEY`, `CLAUDE_API_KEY`), which takes precedence, so a one-off run can supply a
+key without storing anything.
 
 newswatcher summarizes with Gemini's free tier by default. Choose another provider,
 and optionally a specific model, with `--provider` / `--model`, or persistently
@@ -197,6 +201,18 @@ and `llm_model` in `config.toml`):
 newswatcher poll --provider claude --model claude-sonnet-5
 export NEWSWATCHER_LLM_PROVIDER=openai
 ```
+
+### Moving a key from an older newswatcher
+
+Earlier versions kept the LLM key in newswatcher's own `credentials.json`. newswatcher no longer
+reads it; move the key to thinchat's store once (the key names already match), after which the old
+file can be removed:
+
+```sh
+credbox migrate --from-app newswatcher --to-app thinchat --remove-source
+```
+
+`newswatcher setup` prints this command when it finds a key left in the old location.
 
 ## Responsible collection
 
@@ -228,8 +244,8 @@ any interval under a day works (`--every 45`, `--every 5h`); on Linux and macOS 
 only fires intervals that divide evenly (15/20/30 min, 1/2/4/8/12 h, or daily) and
 rejects the rest rather than mis-scheduling them. The scheduled process uses the same
 configuration as an interactive poll, so make sure the LLM key is reachable (from
-`credentials.json` or its environment variable) along with any settings not stored
-in `config.toml`.
+thinchat's store or its environment variable) along with any settings not stored
+in `config.toml`. `newswatcher doctor` confirms it before you schedule.
 
 On Windows the task is registered under the installing user and runs in their
 interactive session, so it does not fire while nobody is signed in — a locked screen is

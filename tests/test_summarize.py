@@ -14,18 +14,17 @@ class _FakeClient:
     def complete(self, prompt, system=None): return self._reply
 
 
-def test_summary_error_hides_key(monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "SECRET-KEY-123")
-
+def test_summary_wraps_a_provider_error_as_llmerror(monkeypatch):
+    # thinchat scrubs any provider key from its own ThinchatError; newswatcher's job is only to
+    # wrap that error as an LLMError so a caller catches one package's failure type.
     class _Raising(_FakeClient):
         def complete(self, prompt, system=None):
-            raise ThinchatError("HTTP 401 at https://gen.../v1?key=SECRET-KEY-123")
+            raise ThinchatError("provider call failed")
 
     monkeypatch.setattr(summarize, "make_llm_client", lambda *a, **k: _Raising(""))
     item = FeedItem(title="t", link="u", guid="g", source_name="s")
-    with pytest.raises(LLMError) as excinfo:
+    with pytest.raises(LLMError):
         summarize.summarize_article(item, "body")
-    assert "SECRET-KEY-123" not in str(excinfo.value)
 
 
 def test_summarize_article_uses_body(monkeypatch):

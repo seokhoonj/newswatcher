@@ -3,6 +3,7 @@ import argparse
 import pytest
 
 import newswatcher.cli as cli
+from newswatcher import credentials
 
 
 def test_watch_clamps_negative_sleep(monkeypatch):
@@ -121,6 +122,144 @@ def test_unknown_command_exits_nonzero(monkeypatch, tmp_path):
     _xdg(monkeypatch, tmp_path)
     code = cli.main(["frobnicate"])
     assert code != 0
+
+
+def test_set_key_stores_the_prompted_key(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "typed-key")
+    assert cli.main(["set-key", "gemini"]) == 0
+    assert "typed-key" not in capsys.readouterr().out   # the value is confirmed, never echoed
+    import thinchat
+    resolved = thinchat.get_api_key("gemini")   # the key lands in thinchat's store, not newswatcher's
+    assert resolved is not None and resolved.reveal() == "typed-key"
+
+
+def test_set_key_rejects_an_unknown_provider(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    # A typo is rejected before the prompt: getpass must never be reached.
+    monkeypatch.setattr("getpass.getpass",
+                        lambda prompt="": pytest.fail("should not prompt for an unknown provider"))
+    assert cli.main(["set-key", "nope"]) == 1
+
+
+def test_set_key_rejects_a_keyless_provider(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setattr("getpass.getpass",
+                        lambda prompt="": pytest.fail("should not prompt for a keyless provider"))
+    assert cli.main(["set-key", "ollama"]) == 1
+
+
+def test_set_key_rejects_a_blank_entry(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "   ")
+    assert cli.main(["set-key", "gemini"]) == 2   # blank entry -> usage error, stores nothing
+    import thinchat
+    assert thinchat.get_api_key("gemini") is None
+
+
+def test_set_key_handles_closed_stdin(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+    def _eof(prompt=""):
+        raise EOFError
+
+    monkeypatch.setattr("getpass.getpass", _eof)
+    assert cli.main(["set-key", "gemini"]) == 2   # stdin closed -> usage error, stores nothing
+    import thinchat
+    assert thinchat.get_api_key("gemini") is None
+
+
+def test_doctor_exits_nonzero_when_the_llm_key_is_missing(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    assert cli.main(["doctor"]) == 1   # a configured channel (LLM) has no secret
+    out = capsys.readouterr().out
+    assert "credentials" in out and "not set" in out
+    assert "thinchat/credentials.json" in out   # the store path is shown, not hidden
+
+
+def test_doctor_exits_zero_when_everything_configured_is_set(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    import thinchat
+    thinchat.set_api_key("gemini", value="a-key")   # LLM set; email/chat unconfigured (not counted)
+    assert cli.main(["doctor"]) == 0
+
+
+def test_setup_fills_the_missing_llm_key(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "wizard-key")
+    assert cli.main(["setup"]) == 0   # LLM filled; email/chat unconfigured are reported, not failed
+    captured = capsys.readouterr()
+    assert "wizard-key" not in captured.out and "wizard-key" not in captured.err   # never echoed
+    import thinchat
+    resolved = thinchat.get_api_key("gemini")
+    assert resolved is not None and resolved.reveal() == "wizard-key"
+
+
+def test_setup_continues_after_one_channel_fails(monkeypatch, tmp_path, capsys):
+    # setup's promised per-channel isolation: a failed setter is reported and the next channel
+    # still runs. Two MISSING channels; the first setter raises, the second must still store.
+    _xdg(monkeypatch, tmp_path)
+    from newswatcher.credentials import Channel, ChannelState
+    from newswatcher.errors import ConfigError
+
+    recorded: dict[str, str] = {}
+
+    def fail_setter(value):
+        raise ConfigError("the first channel's store is broken")
+
+    def ok_setter(value):
+        recorded["second"] = value
+
+    channels = [
+        Channel("first", "toolA", "~/a", ChannelState.MISSING, setter=fail_setter),
+        Channel("second", "toolB", "~/b", ChannelState.MISSING, setter=ok_setter),
+    ]
+    monkeypatch.setattr(credentials, "channels", lambda provider: channels)
+    monkeypatch.setattr(credentials, "legacy_llm_store", lambda: None)
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "value")
+    assert cli.main(["setup"]) == 1   # one channel failed -> non-zero
+    assert recorded["second"] == "value"   # ...but the second channel still ran
+    assert "first" in capsys.readouterr().err   # the failure was reported
+
+
+def test_doctor_never_prints_the_stored_secret(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    import thinchat
+    thinchat.set_api_key("gemini", value="super-secret-value")
+    assert cli.main(["doctor"]) == 0
+    captured = capsys.readouterr()
+    assert "super-secret-value" not in captured.out
+    assert "super-secret-value" not in captured.err
+
+
+def test_setup_skips_a_channel_when_no_value_is_entered(monkeypatch, tmp_path):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "")   # empty -> skip, store nothing
+    assert cli.main(["setup"]) == 0
+    import thinchat
+    assert thinchat.get_api_key("gemini") is None
+
+
+def test_setup_points_at_the_migration_for_a_lingering_legacy_store(monkeypatch, tmp_path, capsys):
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    import credbox
+    credbox.Credentials("newswatcher").set("GEMINI_API_KEY", value="old-key")
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "")
+    cli.main(["setup"])
+    captured = capsys.readouterr()
+    # the full, runnable command is shown -- not a partial fragment
+    assert ("credbox migrate --from-app newswatcher --to-app thinchat --remove-source"
+            in captured.out)
+    assert "old-key" not in captured.out and "old-key" not in captured.err   # never the value
 
 
 def _poll_returning_one(monkeypatch):

@@ -47,6 +47,9 @@ newswatcher poll
 | `topics` | 정의된 토픽을 include / exclude 키워드와 함께 나열. |
 | `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | 소스 등록 — RSS 피드(`--kind rss`) 또는 robots 허용 크롤 페이지(`--kind crawl`) — 와 테스트할 `--topic`들. crawl 소스는 selector 필요: `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 소스의 모든 기사 보관(피드 전체가 온토픽인 전문지용). |
 | `sources` | 등록된 소스를 kind·URL·토픽과 함께 나열. |
+| `set-key <provider>` | LLM provider의 API 키를 에코 없이 입력받아 thinchat 저장소(mode 0600)에 저장. provider는 `gemini`·`openai`·`claude`; 키는 같은 이름의 `*_API_KEY` 환경 변수에서도 읽으며 그쪽이 우선. |
+| `setup [--provider P]` | 각 채널의 빠진 비밀을 한 번의 안내식 패스로 채움 — LLM 키는 thinchat, 이메일 비번은 mailmail, 챗 토큰은 pushpush에. 에코 없이 입력받고 각각 어디에 저장됐는지 출력. 이미 설정된 것은 건너뛰고, 계정·라우트가 아직 없는 채널은 해당 도구로 안내. |
+| `doctor [--provider P]` | 각 비밀과 설정 파일이 어디 있고 설정됐는지를 비밀 값 출력 없이 표시. 설정된 채널에 비밀이 없거나 저장소를 읽을 수 없으면 non-zero로 종료하므로, 예약 실행이 설정 완료 여부를 게이트로 쓸 수 있음. |
 | `recent <url> [--limit N]` | 피드 최신 항목(제목+링크)을 저장·요약 없이 출력 — 등록 전 URL 확인용. `--limit N`으로 개수 제한. |
 | `poll` | 한 번의 패스: 전 소스 fetch → 토픽에 맞는 새 기사만 요약·아카이브 → 다이제스트 발송. `--to`/`--push`=목적지, `--no-mail`=발송 없이 수집만, `--no-store`=아카이브 안 함, `--no-heal`=selector 복구 생략, `--provider`/`--model`=LLM 선택. |
 | `watch [--every N]` | `poll`을 포그라운드에서 `--every` 분(기본 30)마다 반복, 중단할 때까지. poll의 모든 옵션을 받음. |
@@ -58,7 +61,8 @@ newswatcher poll
 
 다이제스트는 이메일, 채팅, 또는 둘 다로 보낼 수 있습니다. 원하는 대상을 하나 이상
 설정합니다. 두 채널 모두 newswatcher와 함께 설치되는 동반 패키지가 처리하며, 각자 자기
-자격증명을 관리하므로 newswatcher는 당신의 이메일 비번이나 봇 토큰을 저장하지 않습니다.
+자격증명을 자기 저장소에 관리하므로 newswatcher는 당신의 이메일 비번이나 봇 토큰을
+저장하지 않습니다.
 
 - 이메일은 mailmail 패키지로 보냅니다. 계정(또는 주소록 별칭)을 mailmail 자체 CLI
   (`mailmail --help`)로 한 번 설정한 뒤, `--to ADDRESS`(또는 `NEWSWATCHER_DIGEST_TO` 설정)로
@@ -68,8 +72,10 @@ newswatcher poll
   `NEWSWATCHER_DIGEST_PUSH` 설정)로 그 라우트를 지정합니다. 다이제스트는 markdown 메시지
   한 통으로 전송됩니다.
 
-즉 newswatcher가 직접 갖는 비밀은 LLM provider 키(아래)뿐이고, 이메일·챗 자격증명은
-mailmail·pushpush에 있습니다.
+즉 newswatcher는 자기 비밀을 하나도 갖지 않습니다: LLM 키는 thinchat, 이메일 비번은
+mailmail, 챗 토큰은 pushpush에 — 각 도구를 단독으로 쓸 때와 똑같이 각자 저장소에 있습니다.
+`newswatcher setup`으로 한 번에 안내식으로 설정하고, `newswatcher doctor`로 무엇이 어디에
+설정돼 있는지 전체 지도를 확인합니다.
 
 ## 뉴스 피드
 
@@ -168,20 +174,17 @@ poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다
 
 ## provider 키와 모델
 
-LLM provider 키는 비밀이므로 설정과 분리되어, 같은 설정 디렉터리의
-`credentials.json`에 저장합니다. provider의 표준 환경 변수 이름을 키로 쓰는 평범한
-JSON 맵입니다.
+LLM provider 키는 비밀이며, newswatcher가 아니라 요약에 쓰는 thinchat 라이브러리의
+저장소에 있습니다. `setup`(이메일·챗까지 같은 패스에서 설정) 또는 키만 넣는 `set-key`로
+한 번 저장하며, 둘 다 에코 없이 입력받아 thinchat 저장소(mode 0600)에 씁니다.
 
-```json
-{
-  "GEMINI_API_KEY": "...",
-  "OPENAI_API_KEY": "...",
-  "CLAUDE_API_KEY": "..."
-}
+```sh
+newswatcher setup            # LLM 키 + 이메일 + 챗을 한 번에
+newswatcher set-key gemini   # LLM 키만
 ```
 
-각 키는 같은 이름의 환경 변수에서도 읽으며 환경 변수가 우선하므로, 파일을 고치지
-않고도 일회성으로 키를 넣을 수 있습니다.
+각 키는 표준 환경 변수(`GEMINI_API_KEY`·`OPENAI_API_KEY`·`CLAUDE_API_KEY`)에서도 읽으며
+환경 변수가 우선하므로, 아무것도 저장하지 않고 일회성으로 키를 넣을 수 있습니다.
 
 newswatcher는 기본적으로 Gemini 무료 티어로 요약합니다. 다른 provider(그리고 원하면
 특정 모델)는 `--provider` / `--model`로 고르거나, `NEWSWATCHER_LLM_PROVIDER` /
@@ -192,6 +195,18 @@ newswatcher는 기본적으로 Gemini 무료 티어로 요약합니다. 다른 p
 newswatcher poll --provider claude --model claude-sonnet-5
 export NEWSWATCHER_LLM_PROVIDER=openai
 ```
+
+### 예전 newswatcher에서 키 옮기기
+
+이전 버전은 LLM 키를 newswatcher 자체 `credentials.json`에 보관했습니다. 이제
+newswatcher는 그 파일을 읽지 않으니, 키를 thinchat 저장소로 한 번 옮기면(키 이름이 이미
+동일합니다) 예전 파일은 지워도 됩니다.
+
+```sh
+credbox migrate --from-app newswatcher --to-app thinchat --remove-source
+```
+
+`newswatcher setup`은 예전 위치에 키가 남아 있으면 이 명령을 출력합니다.
 
 ## 책임 있는 수집
 
@@ -223,8 +238,9 @@ newswatcher schedule remove
 Windows에서는 하루 미만의 임의 간격이 동작하고(`--every 45`, `--every 5h`),
 Linux·macOS의 cron은 나눠떨어지는 간격(15/20/30분, 1/2/4/8/12시간, 하루)만 실행하며
 그 외 간격은 잘못 예약하지 않고 거부합니다. 예약 실행도 대화형 poll과 같은 설정을
-사용하므로, LLM 키가 (`credentials.json` 또는 환경 변수로) 닿는지와 `config.toml`에
-저장하지 않은 설정이 예약 실행 환경에 제공되는지 확인해야 합니다.
+사용하므로, LLM 키가 (thinchat 저장소 또는 환경 변수로) 닿는지와 `config.toml`에
+저장하지 않은 설정이 예약 실행 환경에 제공되는지 확인해야 합니다. `newswatcher doctor`로
+예약 전에 확인할 수 있습니다.
 
 Windows에서는 설치한 사용자의 대화형 세션으로 작업이 등록되므로, 아무도 로그인하지
 않은 상태에서는 발화하지 않습니다(화면 잠금은 괜찮지만 로그인 화면은 아닙니다). 또한

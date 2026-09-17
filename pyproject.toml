@@ -26,13 +26,14 @@ classifiers     = [
 requires-python = ">=3.11"
 dependencies    = [
     "beautifulsoup4>=4.12",
+    "credbox>=0.4.0,<0.5",
     "feedparser>=6.0",
     "lxml>=5.0",
-    "mailmail>=0.2",
-    "pushpush>=0.2",
+    "mailmail>=0.4.2",
+    "pushpush>=0.3.1",
     "requests>=2.31",
     "soupsieve>=2.4",
-    "thinchat>=0.1,<0.2",
+    "thinchat>=0.3.1,<0.4",
     "trafilatura>=1.8",
 ]
 

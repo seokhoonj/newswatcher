@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from thinchat.errors import ThinchatError
 
-from newswatcher._llm import DEFAULT_PROVIDER, make_llm_client, scrub_exception, scrub_secrets
+from newswatcher._llm import DEFAULT_PROVIDER, make_llm_client
 from newswatcher.errors import LLMError
 from newswatcher.feed import FeedItem
 
@@ -53,9 +53,9 @@ def summarize_article(
             text = client.complete(prompt, system=_SYSTEM).strip()
             resolved_model = client.model   # the model actually used; read before the client closes
         except ThinchatError as err:
-            raise LLMError(
-                f"summary request failed: {scrub_secrets(str(err), extra_key=api_key)}"
-            ) from scrub_exception(err, extra_key=api_key)
+            # thinchat scrubs any provider key from its own error and the chain beneath it, so
+            # the message is safe to interpolate as-is.
+            raise LLMError(f"summary request failed: {err}") from err
     if not text:
         raise LLMError("summary request returned an empty reply")
     return Summary(text=text, model=resolved_model)
