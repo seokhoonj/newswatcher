@@ -60,13 +60,51 @@ def test_send_digest_hands_summary_and_link_to_mailmail(monkeypatch):
     class _Fake:
         MailmailError = RuntimeError
 
-        def send(self, *, subject, body, to, account=None):
+        def send(self, *, subject, body, to, html=None, account=None):
             sent.update(subject=subject, body=body, to=to)
 
     monkeypatch.setattr(digest, "_load_mailmail", lambda: _Fake())
     send_digest((_story("보험료 인상", "insurance", summary="요약문"),), email_to="you@e.com")
     assert sent["to"] == "you@e.com"
     assert "요약문" in sent["body"] and "https://e.com/x" in sent["body"]
+
+
+def test_render_html_digest_is_a_full_document_grouped_by_topic():
+    html = digest.render_html_digest(
+        (_story("보험료 인상", "insurance", summary="요약문", link="https://e.com/x"),
+         _story("은행 금리", "banking")))
+    assert html.startswith("<!DOCTYPE html>")
+    assert "보험료 인상" in html and "요약문" in html and "https://e.com/x" in html
+    assert "insurance" in html and "banking" in html
+
+
+def test_render_html_digest_notes_other_outlets():
+    lead = _article("코스피 3000 돌파", "markets", link="https://a.com/1", source="yonhap")
+    dup = _article("코스피 3000선 돌파", "markets", link="https://b.com/2", source="hankyung")
+    html = digest.render_html_digest((Story(lead=lead, duplicates=(dup,)),))
+    assert "also reported by: hankyung" in html
+
+
+def test_render_html_digest_escapes_article_text():
+    html = digest.render_html_digest((_story("A & B <script>", "t", summary="x < y"),))
+    assert "<script>" not in html and "&lt;script&gt;" in html
+    assert "x &lt; y" in html
+
+
+def test_send_digest_passes_an_html_body_to_mailmail(monkeypatch):
+    sent: dict[str, str] = {}
+
+    class _Fake:
+        MailmailError = RuntimeError
+
+        def send(self, *, subject, body, to, html=None, account=None):
+            sent.update(body=body, html=html or "")
+
+    monkeypatch.setattr(digest, "_load_mailmail", lambda: _Fake())
+    send_digest((_story("보험료 인상", "insurance", summary="요약문"),), email_to="you@e.com")
+    assert sent["html"].startswith("<!DOCTYPE html>")
+    assert "보험료 인상" in sent["html"] and "요약문" in sent["html"]
+    assert "요약문" in sent["body"]   # the plain-text fallback still carries the same content
 
 
 def test_send_digest_hands_the_digest_to_pushpush_as_markdown(monkeypatch):
@@ -92,7 +130,7 @@ def test_send_digest_reaches_both_channels_when_both_are_given(monkeypatch):
     class _Mail:
         MailmailError = RuntimeError
 
-        def send(self, *, subject, body, to, account=None):
+        def send(self, *, subject, body, to, html=None, account=None):
             mailed.append(to)
 
     class _Push:
@@ -114,7 +152,7 @@ def test_send_digest_returns_a_partial_failure_without_raising(monkeypatch):
     class _Mail:
         MailmailError = RuntimeError
 
-        def send(self, *, subject, body, to, account=None):
+        def send(self, *, subject, body, to, html=None, account=None):
             pass
 
     class _Push:
@@ -137,7 +175,7 @@ def test_send_digest_raises_only_when_every_channel_fails(monkeypatch):
     class _Mail:
         MailmailError = RuntimeError
 
-        def send(self, *, subject, body, to, account=None):
+        def send(self, *, subject, body, to, html=None, account=None):
             raise self.MailmailError("smtp down")
 
     class _Push:
