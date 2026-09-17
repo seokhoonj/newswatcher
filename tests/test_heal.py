@@ -25,6 +25,30 @@ def test_heal_wraps_a_provider_error_as_healerror(monkeypatch):
     with pytest.raises(HealError):
         heal.heal_source(BROKEN, gate=None)
 
+
+def test_heal_error_never_carries_the_api_key(monkeypatch):
+    # newswatcher hands the resolved key to make_llm_client and relies on thinchat to scrub its own
+    # errors; this pins that newswatcher's OWN error composition never re-adds the key it was given
+    # (a regression guard against interpolating api_key into a HealError, not a re-test of thinchat).
+    class _Raising:
+        model = "m"
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def complete(self, prompt, system=None):
+            raise ThinchatError("provider call failed")   # scrubbed: carries no key
+
+    monkeypatch.setattr(heal, "_fetch_listing", lambda s, g, sess: HTML)
+    monkeypatch.setattr(heal, "make_llm_client", lambda *a, **k: _Raising())
+    with pytest.raises(HealError) as excinfo:
+        heal.heal_source(BROKEN, gate=None, api_key="SENTINEL-KEY-abc123")
+    chain = []
+    err: BaseException | None = excinfo.value
+    while err is not None:
+        chain.append(str(err))
+        err = err.__cause__
+    assert all("SENTINEL-KEY-abc123" not in text for text in chain)
+
+
 BROKEN = Source("무RSS", kind="crawl", url="https://e.com/list", topics=("t",),
                 item="ul.OLD li", title="a.old", link="a.old@href")
 

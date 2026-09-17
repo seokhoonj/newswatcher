@@ -27,6 +27,25 @@ def test_summary_wraps_a_provider_error_as_llmerror(monkeypatch):
         summarize.summarize_article(item, "body")
 
 
+def test_summary_error_never_carries_the_api_key(monkeypatch):
+    # As in heal: newswatcher relies on thinchat to scrub its own errors, and this pins that
+    # newswatcher's own LLMError composition never re-adds the key it was handed.
+    class _Raising(_FakeClient):
+        def complete(self, prompt, system=None):
+            raise ThinchatError("provider call failed")   # scrubbed: carries no key
+
+    monkeypatch.setattr(summarize, "make_llm_client", lambda *a, **k: _Raising(""))
+    item = FeedItem(title="t", link="u", guid="g", source_name="s")
+    with pytest.raises(LLMError) as excinfo:
+        summarize.summarize_article(item, "body", api_key="SENTINEL-KEY-abc123")
+    chain = []
+    err: BaseException | None = excinfo.value
+    while err is not None:
+        chain.append(str(err))
+        err = err.__cause__
+    assert all("SENTINEL-KEY-abc123" not in text for text in chain)
+
+
 def test_summarize_article_uses_body(monkeypatch):
     def fake_make(*a, **k):
         return _FakeClient(" 보험료가 올랐다는 기사. ")

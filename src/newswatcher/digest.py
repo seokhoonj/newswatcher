@@ -11,7 +11,8 @@ on that channel happens."""
 from __future__ import annotations
 
 from html import escape
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Literal, Protocol, cast
+from urllib.parse import urlsplit
 
 from newswatcher.errors import DigestError
 from newswatcher.stories import Story
@@ -34,7 +35,8 @@ class _MailmailModule(Protocol):
 class _PushpushModule(Protocol):
     PushpushError: type[Exception]
 
-    def send(self, text: str, *, to: str, markup: str = ...) -> object: ...
+    def send(self, text: str, *, to: str,
+             markup: Literal["plain", "markdown", "html"] = ...) -> object: ...
 
 
 def render_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...] = ()
@@ -64,17 +66,17 @@ def render_html_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...
     from mailmail import HTMLLayout
 
     layout = HTMLLayout()
-    parts = [layout.header(eyebrow="newswatcher", title=_headline(len(stories)))]
+    html_parts = [layout.header(eyebrow="newswatcher", title=_headline(len(stories)))]
     if not stories:
-        parts.append(layout.para_row(escape("No new articles this run.")))
+        html_parts.append(layout.para_row(escape("No new articles this run.")))
     else:
         for topic, group in _group_by_topic(stories):
-            parts.append(layout.section(f"{topic} ({len(group)})"))
-            parts.extend(layout.para_row(_story_html(layout, story)) for story in group)
+            html_parts.append(layout.section(f"{topic} ({len(group)})"))
+            html_parts.extend(layout.para_row(_story_html(layout, story)) for story in group)
     if heal_notes:
-        parts.append(layout.section("selector repairs"))
-        parts.append(layout.para_row("<br>".join(escape(note) for note in heal_notes)))
-    return layout.render_page(parts)
+        html_parts.append(layout.section("selector repairs"))
+        html_parts.append(layout.para_row("<br>".join(escape(note) for note in heal_notes)))
+    return layout.render_page(html_parts)
 
 
 def _headline(count: int) -> str:
@@ -85,16 +87,30 @@ def _headline(count: int) -> str:
 
 def _story_html(layout: HTMLLayout, story: Story) -> str:
     """One story as an HTML paragraph fragment: the lead's linked title, its summary, and --
-    when other outlets ran the same story -- who else did. Article text is escaped; the layout's
-    own theme colors the title link."""
+    when *another* outlet ran the same story -- who else did. Leaf text is escaped; the layout's
+    own theme colors the title link. The title is a link only when the feed's URL is ``http(s)``:
+    ``html.escape`` neutralizes quotes but not the URL scheme, so an off-allowlist scheme falls
+    back to plain text."""
     lead = story.lead
-    title = (f'<a href="{escape(lead.link, quote=True)}" '
-             f'style="color:{layout.theme.heading_color};font-weight:700;'
-             f'text-decoration:none;">{escape(lead.title)}</a>')
-    lines = [title, escape(lead.summary)]
-    if story.duplicates:
-        lines.append("also reported by: " + escape(", ".join(story.also_reported_by)))
-    return "<br>".join(lines)
+    escaped_title = escape(lead.title)
+    if _is_safe_url(lead.link):
+        title = (f'<a href="{escape(lead.link, quote=True)}" '
+                 f'style="color:{layout.theme.heading_color};font-weight:700;'
+                 f'text-decoration:none;">{escaped_title}</a>')
+    else:
+        title = escaped_title
+    html_lines = [title, escape(lead.summary)]
+    if story.also_reported_by:   # excludes the lead's own outlet, so guard on it, not `duplicates`
+        html_lines.append("also reported by: " + escape(", ".join(story.also_reported_by)))
+    return "<br>".join(html_lines)
+
+
+def _is_safe_url(url: str) -> bool:
+    """Whether ``url`` may be placed in an ``href`` -- an ``http`` or ``https`` scheme only. A
+    feed-supplied ``javascript:`` or ``data:`` URL survives ``html.escape`` (which touches quotes,
+    not the scheme) as a live link, so it is the scheme, not the escaping, that has to be checked --
+    the same allowlist bleach, sanitize-html, and feedparser apply to a link target."""
+    return urlsplit(url).scheme in ("http", "https")
 
 
 def send_digest(
@@ -143,13 +159,22 @@ def send_digest(
 def _send_email(subject: str, body: str, stories: tuple[Story, ...],
                 heal_notes: tuple[str, ...], *, to: str, account: str | None) -> None:
     mailmail = _load_mailmail()
-    html = render_html_digest(stories, heal_notes=heal_notes)   # the rich body; body is the text fallback
     try:
+        # Build the rich body inside the try so a too-old mailmail (no HTMLLayout) is funneled to a
+        # DigestError like any other send failure, not raised as a bare ImportError past the caller.
+        html = render_html_digest(stories, heal_notes=heal_notes)   # body is the text fallback
         mailmail.send(subject=subject, body=body, to=to, html=html, account=account)
     except mailmail.MailmailError as err:
         raise DigestError(f"could not send digest email: {err}") from err
     except OSError as err:
+        # mailmail's contract lets a raw transport error through -- and smtplib.SMTPException is
+        # itself an OSError subclass, so this one catch funnels an SMTP disconnect and a network
+        # error alike into the delivery-failure surface.
         raise DigestError(f"network error sending digest email: {err}") from err
+    except ImportError as err:
+        raise DigestError(
+            f"the installed mailmail is too old to render the digest: {err}; upgrade mailmail"
+        ) from err
 
 
 def _send_chat(subject: str, body: str, *, to: str) -> None:
@@ -187,7 +212,7 @@ def _render_story(story: Story) -> str:
     the same story -- a line naming them under it."""
     lead = story.lead
     entry = f"- {lead.title}\n  {lead.summary}\n  {lead.link}"
-    if story.duplicates:
+    if story.also_reported_by:   # excludes the lead's own outlet, so guard on it, not `duplicates`
         entry += f"\n  also reported by: {', '.join(story.also_reported_by)}"
     return entry
 
@@ -196,9 +221,12 @@ def _load_mailmail() -> _MailmailModule:
     try:
         import mailmail
     except ImportError as err:
+        # Funnel any import failure -- the package absent OR a broken sub-dependency -- to
+        # DigestError, so a send never escapes as a raw ImportError past the caller. The message
+        # stays generic rather than claiming "not installed", which a sub-dependency failure is not.
         raise DigestError(
-            "the mailmail package is required to send digests but could not be imported; "
-            "reinstall newswatcher"
+            f"the mailmail package could not be imported ({err}); "
+            f"reinstall or repair newswatcher's dependencies"
         ) from err
     return cast(_MailmailModule, mailmail)
 
@@ -208,7 +236,7 @@ def _load_pushpush() -> _PushpushModule:
         import pushpush
     except ImportError as err:
         raise DigestError(
-            "the pushpush package is required to send a chat digest but could not be "
-            "imported; reinstall newswatcher"
+            f"the pushpush package could not be imported ({err}); "
+            f"reinstall or repair newswatcher's dependencies"
         ) from err
     return cast(_PushpushModule, pushpush)
