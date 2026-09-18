@@ -31,23 +31,31 @@ pip install "newswatcher[all]"     # + 둘 다
 
 ## 2. 빠른 시작
 
-토픽과 RSS 소스를 등록하고, 다이제스트 수신 주소와 기본 Gemini LLM provider
-(LLM 서비스를 제공하는 업체)용 API 키를 설정한 다음 한 번 poll을 실행합니다.
+아래 명령들은 터미널(Terminal·PowerShell·명령 프롬프트 — 파이썬 프롬프트가 아님)에서
+실행합니다. 먼저 [Google AI Studio](https://aistudio.google.com/apikey)에서 무료 Gemini
+API 키(LLM 서비스 업체가 주는 인증 키)를 발급받고(구글 로그인 → **Create API key** → 복사),
+저장합니다 — 입력값은 화면에 표시되지 않습니다:
+
+```sh
+newswatcher set-key gemini
+```
+
+토픽과 RSS 소스를 등록하고 한 번 실행한 뒤 요약을 바로 읽습니다 — 첫 결과를 보는 데는
+이메일 설정이 필요 없습니다:
 
 ```sh
 newswatcher add-topic 증시 --include 코스피 금리 실적 반도체 --exclude 연예
-newswatcher add-source 한국경제 https://www.hankyung.com/feed/all-news \
-  --kind rss --topic 증시
-export NEWSWATCHER_DIGEST_TO=you@example.com
-export GEMINI_API_KEY=your-api-key
-newswatcher poll
+newswatcher add-source 한국경제 "https://www.hankyung.com/feed/all-news" --kind rss --topic 증시
+newswatcher poll --no-mail
+newswatcher articles
 ```
 
 토픽은 피드의 언어로 매칭하므로 키워드도 피드 언어에 맞춥니다. 한국어 피드에는 한국어
-키워드를, 영어 피드에는 영어 키워드를 씁니다.
+키워드를, 영어 피드에는 영어 키워드를 씁니다. `newswatcher topics`·`newswatcher sources`로
+등록 내용을 확인합니다.
 
-`newswatcher topics`와 `newswatcher sources`로 등록 내용을 확인할 수 있습니다. 전체
-명령과 옵션은 `newswatcher --help` 또는 `newswatcher <command> --help`에서 확인합니다.
+`articles`로 읽는 대신 **이메일**이나 **챗**으로 받으려면 전송 extra를 설치하고 채널을 한 번
+설정합니다 — [전송](#4-전송) 참고.
 
 ## 3. 명령
 
@@ -200,7 +208,8 @@ newswatcher set-key gemini   # LLM 키만
 각 키는 표준 환경 변수(`GEMINI_API_KEY`·`OPENAI_API_KEY`·`CLAUDE_API_KEY`)에서도 읽으며
 환경 변수가 우선하므로, 아무것도 저장하지 않고 일회성으로 키를 넣을 수 있습니다.
 
-newswatcher는 기본적으로 Gemini 무료 티어로 요약합니다. 다른 provider(그리고 원하면
+newswatcher는 기본적으로 Gemini 무료 티어로 요약합니다 — 무료 키는
+[Google AI Studio](https://aistudio.google.com/apikey)에서 발급합니다. 다른 provider(그리고 원하면
 특정 모델)는 `--provider` / `--model`로 고르거나, `NEWSWATCHER_LLM_PROVIDER` /
 `NEWSWATCHER_LLM_MODEL` 설정(`config.toml`의 `llm_provider`, `llm_model`)으로
 지속 지정합니다.

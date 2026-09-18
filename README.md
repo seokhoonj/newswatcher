@@ -32,23 +32,31 @@ The Quickstart below emails a digest, so it needs `newswatcher[email]`.
 
 ## 2. Quickstart
 
-Define a topic, register an RSS source, provide a digest recipient and the API
-key for the default Gemini LLM provider, then run one poll:
+These are terminal commands (a shell — Terminal, PowerShell, or Command Prompt — not the
+Python prompt). First get a free Gemini API key from
+[Google AI Studio](https://aistudio.google.com/apikey) (sign in with Google, click **Create
+API key**, copy it), then store it — you are prompted, and the key is not echoed:
+
+```sh
+newswatcher set-key gemini
+```
+
+Define a topic, register an RSS source, run one pass, and read the summaries — no email setup
+needed to get a first result:
 
 ```sh
 newswatcher add-topic markets --include stocks Fed "interest rate" earnings --exclude sports
-newswatcher add-source korea-herald https://www.koreaherald.com/rss/newsAll \
-  --kind rss --topic markets
-export NEWSWATCHER_DIGEST_TO=you@example.com
-export GEMINI_API_KEY=your-api-key
-newswatcher poll
+newswatcher add-source korea-herald "https://www.koreaherald.com/rss/newsAll" --kind rss --topic markets
+newswatcher poll --no-mail
+newswatcher articles
 ```
 
-A topic matches on the feed's own language, so pair the keywords with the feed:
-English keywords for an English feed, Korean keywords for a Korean feed.
+A topic matches on the feed's own language, so pair the keywords with the feed: English
+keywords for an English feed, Korean keywords for a Korean feed. `newswatcher topics` and
+`newswatcher sources` show what you registered.
 
-Use `newswatcher topics` and `newswatcher sources` to inspect the registries. Run
-`newswatcher --help` or `newswatcher <command> --help` for all commands and options.
+To have the digest **emailed** or sent to **chat** instead of read with `articles`, install the
+delivery extra and configure the channel once — see [Delivery](#4-delivery).
 
 ## 3. Commands
 
@@ -207,7 +215,8 @@ Each key is also read from its standard environment variable (`GEMINI_API_KEY`,
 `OPENAI_API_KEY`, `CLAUDE_API_KEY`), which takes precedence, so a one-off run can supply a
 key without storing anything.
 
-newswatcher summarizes with Gemini's free tier by default. Choose another provider,
+newswatcher summarizes with Gemini's free tier by default — get a free key from
+[Google AI Studio](https://aistudio.google.com/apikey). Choose another provider,
 and optionally a specific model, with `--provider` / `--model`, or persistently
 with the `NEWSWATCHER_LLM_PROVIDER` / `NEWSWATCHER_LLM_MODEL` settings (`llm_provider`
 and `llm_model` in `config.toml`):
