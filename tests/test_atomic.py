@@ -47,3 +47,12 @@ def test_write_bytes_atomic_wraps_a_bad_directory(tmp_path):
     with pytest.raises(_WriteError):
         write_bytes_atomic(target, b"payload", _WriteError)
     assert os.path.isfile(blocker)
+
+
+def test_write_text_atomic_wraps_an_encode_failure(tmp_path):
+    # A lone surrogate cannot be UTF-8 encoded; the wrap surfaces it as the caller's
+    # error class (chained) rather than a bare UnicodeEncodeError escaping past the caller.
+    with pytest.raises(_WriteError) as excinfo:
+        write_text_atomic(tmp_path / "x.txt", "\ud800", _WriteError)
+    assert isinstance(excinfo.value.__cause__, UnicodeEncodeError)
+    assert not list(tmp_path.glob("*"))   # nothing half-written

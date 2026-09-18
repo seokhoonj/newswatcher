@@ -390,3 +390,24 @@ def test_send_digest_reports_the_missing_chat_extra(monkeypatch):
     monkeypatch.setitem(sys.modules, "pushpush", None)
     with pytest.raises(DigestError, match=r"newswatcher\[chat\]"):
         send_digest((_story("a", "t"),), push_to="alerts")
+
+
+def test_captured_body_never_reaches_the_rendered_digest(tmp_path):
+    # End-to-end: a body captured for an article's guid lives only in BodyStore; the
+    # digest renders from the Story/Article (which has no body field), so a body sentinel
+    # cannot leak into the outbound email or chat text.
+    from newswatcher.digest import render_html_digest
+    from newswatcher.store import BodyStore
+
+    sentinel = "SENTINEL_BODY_TEXT_zeta"
+    story = _story("보험료 인상", "insurance", link="https://e.com/x")
+    body_store = BodyStore(tmp_path)
+    body_store.save(story.lead.guid, sentinel)
+
+    subject, text = render_digest((story,))
+    html = render_html_digest((story,))
+
+    assert body_store.load(story.lead.guid) == sentinel      # captured privately
+    assert sentinel not in subject
+    assert sentinel not in text
+    assert sentinel not in html

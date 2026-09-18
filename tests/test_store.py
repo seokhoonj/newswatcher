@@ -4,7 +4,7 @@ from datetime import datetime
 import pytest
 
 from newswatcher.errors import ArchiveError
-from newswatcher.store import Article, FileStore
+from newswatcher.store import Article, BodyStore, FileStore
 
 
 def _article(guid, published, topics=("insurance",), title="t"):
@@ -156,3 +156,60 @@ def test_load_raises_on_an_unreadable_file(tmp_path, monkeypatch):
     monkeypatch.setattr("pathlib.Path.read_text", _boom)
     with pytest.raises(ArchiveError):
         store.load()
+
+
+def test_body_store_save_then_load_roundtrip(tmp_path):
+    body_store = BodyStore(tmp_path)
+    body_store.save("https://e.com/a1", "full article text")
+    assert body_store.load("https://e.com/a1") == "full article text"
+
+
+def test_body_store_load_missing_is_none(tmp_path):
+    assert BodyStore(tmp_path).load("https://e.com/none") is None
+
+
+def test_body_store_empty_body_is_not_written(tmp_path):
+    body_store = BodyStore(tmp_path)
+    body_store.save("https://e.com/a1", "")
+    assert body_store.load("https://e.com/a1") is None
+    assert list(tmp_path.glob("*.txt")) == []
+
+
+def test_body_store_save_is_idempotent_by_guid(tmp_path):
+    body_store = BodyStore(tmp_path)
+    body_store.save("https://e.com/a1", "first")
+    body_store.save("https://e.com/a1", "second")
+    assert body_store.load("https://e.com/a1") == "second"
+    assert len(list(tmp_path.glob("*.txt"))) == 1
+
+
+def test_body_store_load_raises_on_an_unreadable_file(tmp_path, monkeypatch):
+    body_store = BodyStore(tmp_path)
+    body_store.save("g", "text")
+
+    def _boom(self, *a, **k):
+        raise OSError("permission denied")
+
+    monkeypatch.setattr("pathlib.Path.read_text", _boom)
+    with pytest.raises(ArchiveError):
+        body_store.load("g")   # a real read failure surfaces as ArchiveError, not OSError
+
+
+def test_load_reads_a_pre_body_archive_file(tmp_path):
+    # A 0.1.0 archive file (written before the body-capture feature, no body-related
+    # fields) still loads unchanged: the article schema did not change.
+    store = FileStore(tmp_path)
+    (tmp_path / "articles").mkdir(parents=True)
+    envelope = {
+        "schema_version": 1,
+        "saved_at": "2026-08-15T00:00:00Z",
+        "article": {
+            "guid": "https://e.com/legacy", "title": "legacy", "link": "https://e.com/legacy",
+            "source_name": "s", "published": "2026-08-15T00:00:00Z",
+            "topics": ["insurance"], "summary": "our summary", "summary_model": "m",
+        },
+    }
+    (tmp_path / "articles" / "legacy.json").write_text(json.dumps(envelope), encoding="utf-8")
+    loaded = store.load()
+    assert len(loaded) == 1
+    assert loaded[0].guid == "https://e.com/legacy" and loaded[0].summary == "our summary"

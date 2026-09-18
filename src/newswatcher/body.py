@@ -1,8 +1,8 @@
 """Fetch an article page and extract its main text — the raw material an LLM summary
-is written from. The body is transient: it is never stored in the archive nor placed
-in the outbound email (which carry only our summary plus the link). Extraction uses
-the source's ``body_selector`` when it defines one, else the generic extractor
-(trafilatura)."""
+is written from. The body is never part of the article archive and never goes into the
+outbound email -- both carry only our summary and the link; a poll can optionally capture
+it to a separate ``BodyStore``. Extraction uses the source's ``body_selector`` when it
+defines one, else the generic extractor (trafilatura)."""
 
 from __future__ import annotations
 

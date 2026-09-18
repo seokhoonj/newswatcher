@@ -1,6 +1,8 @@
 """Persist and reload archived articles -- metadata plus our LLM summary. The article
-body is never stored: the archive keeps what is ours to keep (title, link, source,
-date, matched topics, our summary), not the publisher's text.
+archive keeps only what is ours to keep (title, link, source, date, matched topics, our
+summary), not the publisher's text. The fetched body can optionally be captured to a
+*separate* store (``BodyStore``) when a poll opts in; the article archive itself never
+carries it.
 
 One JSON file per article under ``archive_root()``, keyed by a filesystem-safe hash
 of the article guid, written atomically. Saving is idempotent -- re-saving the same
@@ -14,11 +16,11 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from newswatcher._atomic import write_bytes_atomic
+from newswatcher._atomic import write_text_atomic
 from newswatcher.config import data_dir
 from newswatcher.errors import ArchiveError
 
-__all__ = ["Article", "FileStore", "archive_root"]
+__all__ = ["Article", "BodyStore", "FileStore", "archive_root", "bodies_root"]
 
 _SCHEMA_VERSION = 1
 _ARTICLES_DIRNAME = "articles"
@@ -27,10 +29,11 @@ _TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Article:
-    """One archived article: metadata and our summary. No body -- bodies are transient
-    summary input, never stored. ``published`` is ISO-8601 (or "") and orders the
-    archive; ``topics`` are the names it was tagged with; ``summary`` is our original
-    text and ``summary_model`` which model wrote it."""
+    """One archived article: metadata and our summary. No body field -- the article
+    archive never carries the publisher's text; a fetched body is only optionally captured
+    to a separate ``BodyStore``. ``published`` is ISO-8601 (or "") and orders the archive;
+    ``topics`` are the names it was tagged with; ``summary`` is our original text and
+    ``summary_model`` which model wrote it."""
 
     guid:          str
     title:         str
@@ -70,8 +73,8 @@ class FileStore:
             "saved_at": datetime.now(UTC).strftime(_TIMESTAMP_FORMAT),
             "article": asdict(article),
         }
-        payload = json.dumps(envelope, ensure_ascii=False, indent=2).encode("utf-8")
-        write_bytes_atomic(path, payload, ArchiveError)
+        payload = json.dumps(envelope, ensure_ascii=False, indent=2)
+        write_text_atomic(path, payload, ArchiveError)
 
     def load(self, *, topic: str | None = None, since: str | None = None,
              until: str | None = None) -> tuple[Article, ...]:
@@ -132,6 +135,58 @@ class FileStore:
                 raise ArchiveError(f"could not delete {path}: {err}") from err
             removed += 1
         return removed
+
+
+def bodies_root() -> Path:
+    """The captured-body directory, ``bodies`` under ``data_dir()`` -- a sibling of
+    ``archive``. Populated only when a poll opts into body capture.
+
+    Raises:
+        ConfigError: no data directory can be resolved (propagated from ``data_dir``)."""
+    return data_dir() / "bodies"
+
+
+class BodyStore:
+    """A directory of one text file per captured article body, keyed by guid under
+    ``root`` (default ``bodies_root()``). Kept separate from ``FileStore``: the article
+    archive stays summary-and-link only, while this holds the raw fetched text a poll
+    captures when the user opts in -- to re-summarize later, or to keep the original once
+    the source page changes or disappears. The body is private input, never delivered.
+
+    Bodies are never auto-removed -- there is no retention window (unlike ``FileStore``'s
+    ``prune_older_than``), because a captured body is kept deliberately to preserve the
+    original text. Removing them is the caller's choice."""
+
+    def __init__(self, root: Path | None = None) -> None:
+        # ``root`` is the store's own directory: bodies are written directly under it,
+        # unlike ``FileStore``, whose ``root`` is a parent holding an ``articles`` subdir.
+        self._dir = root if root is not None else bodies_root()
+
+    def save(self, guid: str, body: str) -> None:
+        """Store ``body`` keyed by ``guid``; a re-save overwrites in place. A "" body is
+        not written -- nothing was extracted, so there is nothing to keep.
+
+        Raises:
+            ArchiveError: the body could not be written (an I/O failure).
+        """
+        if not body:
+            return
+        path = self._dir / f"{_key(guid)}.txt"
+        write_text_atomic(path, body, ArchiveError)
+
+    def load(self, guid: str) -> str | None:
+        """The captured body for ``guid``, or ``None`` when none was stored.
+
+        Raises:
+            ArchiveError: the body file exists but could not be read (an I/O failure).
+        """
+        path = self._dir / f"{_key(guid)}.txt"
+        try:
+            return path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
+        except OSError as err:
+            raise ArchiveError(f"could not read {path}: {err}") from err
 
 
 def _key(guid: str) -> str:

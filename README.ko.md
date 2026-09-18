@@ -75,7 +75,7 @@ newswatcher articles
 | `setup [--provider P]` | 각 채널의 빠진 비밀을 한 번의 안내식 패스로 채움 — LLM 키는 thinchat, 이메일 비번은 mailmail, 챗 토큰은 pushpush에. 에코 없이 입력받고 각각 어디에 저장됐는지 출력. 이미 설정된 것은 건너뛰고, 계정·라우트가 아직 없는 채널은 해당 도구로 안내. |
 | `doctor [--provider P]` | 각 비밀과 설정 파일이 어디 있고 설정됐는지를 비밀 값 출력 없이 표시. 설정된 채널에 비밀이 없거나 저장소를 읽을 수 없으면 non-zero로 종료하므로, 예약 실행이 설정 완료 여부를 게이트로 쓸 수 있음. |
 | `recent <url> [--limit N]` | 피드 최신 항목(제목+링크)을 저장·요약 없이 출력 — 등록 전 URL 확인용. `--limit N`으로 개수 제한. |
-| `poll` | 한 번의 패스: 전 소스 fetch → 토픽에 맞는 새로운 기사만 요약·아카이브 → 다이제스트 발송. `--to`/`--push`=목적지, `--no-mail`=발송 없이 수집만, `--no-store`=아카이브 안 함, `--no-heal`=selector 복구 생략, `--provider`/`--model`=LLM 선택. |
+| `poll` | 한 번의 패스: 전 소스 fetch → 토픽에 맞는 새로운 기사만 요약·아카이브 → 다이제스트 발송. `--to`/`--push`=목적지, `--no-mail`=발송 없이 수집만, `--no-store`=아카이브 안 함, `--store-body`=각 기사 본문도 별도 로컬 저장소에 보관, `--no-heal`=selector 복구 생략, `--provider`/`--model`=LLM 선택. |
 | `watch [--every N]` | `poll`을 포그라운드에서 `--every` 분(기본 30)마다 반복, 중단할 때까지. poll의 모든 옵션을 받음. |
 | `articles [--topic NAME] [--since DATE] [--until DATE]` | 아카이브 기사(제목·우리 요약·링크)를 나열, 토픽·반열림 `[since, until)` 날짜 범위로 필터 가능. |
 | `heal [--dry-run] [--provider P] [--model M]` | selector가 끊긴 crawl 소스를 점검해 LLM으로 복구(라이브 페이지로 검증). `--dry-run`은 제안만 보고 쓰지 않음. |
@@ -195,7 +195,12 @@ crawl 소스에는 `item`, `title`, `link` selector (HTML에서 원하는 요소
 archive는 기본적으로 아무것도 지우지 않습니다. 오래된 기록을 정리하려면
 `NEWSWATCHER_ARCHIVE_KEEP_DAYS`(`archive_keep_days`, 양의 정수)를 설정하세요 — 각
 poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다. 미설정이면 무한 보관합니다
-(이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요).
+(이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요). `NEWSWATCHER_STORE_BODY`(`store_body`,
+불리언)는 `--store-body` 플래그 없이도 본문 캡처를 켭니다 — 켜면 각 기사 본문을 data
+디렉터리 아래 별도 `bodies` 폴더(`archive`의 형제)에 보관합니다(재요약·원문 보관용). 기본은
+꺼짐이고, 저장된 본문은 로컬 전용이라 발송되지 않습니다. 저장된 본문은 (기사 아카이브와 달리)
+자동 삭제되지 않으므로 정리는 사용자 몫이며, `--no-store`와 함께 쓰면 본문에 대응하는 아카이브
+기사가 없습니다.
 
 ## 7. provider 키와 모델
 
@@ -236,8 +241,9 @@ export NEWSWATCHER_LLM_PROVIDER=openai
 모든 피드, 목록 페이지, 기사 요청은 전송 전에 사이트의 robots 정책을 확인하며
 newswatcher의 user agent (HTTP 요청에서 프로그램을 식별하는 문자열)를 보냅니다.
 허용되지 않은 URL은 요청하지 않습니다. 지속 archive와 발송 다이제스트에는 LLM이 작성한
-요약, 원문 링크, 메타데이터만 들어갑니다. 원문 본문은 일시적인 요약 입력으로만 쓰며
-archive하거나 발송하지 않습니다.
+요약, 원문 링크, 메타데이터만 들어갑니다. 원문 본문은 일시적인 요약 입력이라 발송되지 않고
+기사 archive에도 들어가지 않습니다. `--store-body`(또는 `NEWSWATCHER_STORE_BODY`)로
+켤 때만 별도 `bodies` 저장소에 보관됩니다.
 
 ## 9. 스케줄링
 

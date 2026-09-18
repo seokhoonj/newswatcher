@@ -4,7 +4,7 @@ from newswatcher.poll import poll_sources
 from newswatcher.robots import RobotsGate
 from newswatcher.sources import Source
 from newswatcher.state import State
-from newswatcher.store import FileStore
+from newswatcher.store import BodyStore, FileStore
 from newswatcher.summarize import Summary
 from newswatcher.topics import Topic
 
@@ -134,3 +134,52 @@ def test_empty_crawl_source_is_reported(tmp_path, monkeypatch):
                           store=FileStore(tmp_path), summarize=_fake_summary)
     assert report.empty_crawl_sources == ("무RSS",)
     assert state.empty_polls_by_source["무RSS"] == 1
+
+
+def test_poll_captures_body_when_body_store_given(tmp_path, monkeypatch):
+    import newswatcher.poll as poll
+    src = Source("범용지", kind="rss", url="u", topics=("insurance",))
+    items = (FeedItem(title="보험 뉴스", link="https://e.com/1", guid="g1",
+                      published="2026-08-15T00:00:00Z", source_name="범용지"),)
+    monkeypatch.setattr(poll, "_collect", lambda s, g, sess: items)
+    monkeypatch.setattr(poll, "_fetch_body", lambda item, s, g, sess: "원문 본문")
+    body_store = BodyStore(tmp_path / "bodies")
+    poll_sources((src,), (Topic("insurance"),), gate=_gate, state=State(),
+                 store=FileStore(tmp_path / "arch"), body_store=body_store,
+                 summarize=_fake_summary)
+    assert body_store.load("g1") == "원문 본문"
+
+
+def test_poll_does_not_capture_body_without_body_store(tmp_path, monkeypatch):
+    import newswatcher.poll as poll
+    src = Source("범용지", kind="rss", url="u", topics=("insurance",))
+    items = (FeedItem(title="보험 뉴스", link="https://e.com/1", guid="g1",
+                      published="2026-08-15T00:00:00Z", source_name="범용지"),)
+    monkeypatch.setattr(poll, "_collect", lambda s, g, sess: items)
+    monkeypatch.setattr(poll, "_fetch_body", lambda item, s, g, sess: "원문 본문")
+    poll_sources((src,), (Topic("insurance"),), gate=_gate, state=State(),
+                 store=FileStore(tmp_path), summarize=_fake_summary)   # no body_store
+    assert BodyStore(tmp_path / "bodies").load("g1") is None
+
+
+def test_poll_body_store_failure_does_not_drop_article(tmp_path, monkeypatch):
+    import newswatcher.poll as poll
+    src = Source("범용지", kind="rss", url="u", topics=("insurance",))
+    items = (FeedItem(title="보험 뉴스", link="https://e.com/1", guid="g1",
+                      published="2026-08-15T00:00:00Z", source_name="범용지"),)
+    monkeypatch.setattr(poll, "_collect", lambda s, g, sess: items)
+    monkeypatch.setattr(poll, "_fetch_body", lambda item, s, g, sess: "원문 본문")
+
+    class _BadBodyStore(BodyStore):
+        def save(self, guid, body):
+            raise ArchiveError("disk full")
+
+    store = FileStore(tmp_path)
+    report = poll_sources((src,), (Topic("insurance"),), gate=_gate, state=State(),
+                          store=store, body_store=_BadBodyStore(tmp_path / "bodies"),
+                          summarize=_fake_summary)
+    assert len(report.collected) == 1        # the article is still collected + archived
+    assert len(store.load()) == 1
+    assert report.skipped == ()              # a body-capture failure is not a drop
+    assert [link for link, _ in report.body_failures] == ["https://e.com/1"]
+    assert "disk full" in report.body_failures[0][1]

@@ -76,7 +76,7 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 | `setup [--provider P]` | Fill in the missing secrets for every channel in one guided pass — the LLM key with thinchat, each email password with mailmail, each chat token with pushpush — prompting without echo and printing where each landed. Skips what is already set, and points you at the tool to configure a channel that has no account or route yet. |
 | `doctor [--provider P]` | Show where each secret and config file lives and whether it is set, without printing any secret. Exits non-zero when a configured channel is missing its secret or its store is unreadable, so a scheduled run can gate on a complete setup. |
 | `recent <url> [--limit N]` | Fetch and print a feed's latest items (title + link) without storing or summarizing — a quick check of a URL before you register it. `--limit N` caps how many. |
-| `poll` | Run one pass: fetch every source, keep the new articles that match a topic, summarize them, archive them, and send the digest. `--to` / `--push` set destinations; `--no-mail` collects without sending; `--no-store` skips archiving; `--no-heal` skips selector repair; `--provider` / `--model` choose the LLM. |
+| `poll` | Run one pass: fetch every source, keep the new articles that match a topic, summarize them, archive them, and send the digest. `--to` / `--push` set destinations; `--no-mail` collects without sending; `--no-store` skips archiving; `--store-body` also keeps each article's fetched body in a separate local store; `--no-heal` skips selector repair; `--provider` / `--model` choose the LLM. |
 | `watch [--every N]` | Run `poll` repeatedly in the foreground, every `--every` minutes (default 30), until you stop it. Takes all of `poll`'s options. |
 | `articles [--topic NAME] [--since DATE] [--until DATE]` | List archived articles (title, our summary, link), optionally narrowed to a topic and a half-open `[since, until)` date range. |
 | `heal [--dry-run] [--provider P] [--model M]` | Check crawl sources whose selectors stopped matching and repair them with an LLM, validated against the live page. `--dry-run` reports the proposed fix without writing it. |
@@ -200,7 +200,13 @@ the XDG data and state directories; `NEWSWATCHER_DATA_DIR` and
 prune old records, set `NEWSWATCHER_ARCHIVE_KEEP_DAYS` (`archive_keep_days`, a positive
 integer) and each poll removes archived articles older than that after the digest is
 sent. Leaving it unset keeps everything (this deletion is irreversible, so enable it
-deliberately).
+deliberately). `NEWSWATCHER_STORE_BODY` (`store_body`, a boolean) turns on body capture
+without the `--store-body` flag: each fetched article body is then kept in a separate
+`bodies` directory under the data dir (alongside `archive`), for re-summarizing or
+keeping the original text. It is off by default, and captured bodies are local only —
+never delivered. Captured bodies are never auto-pruned (unlike the article archive), so
+removing them is your choice; with `--no-store` the kept bodies have no matching archived
+article.
 
 ## 7. Provider keys and model
 
@@ -243,7 +249,9 @@ Every feed, listing-page, and article request is checked against the site's
 robots policy before it is sent, and newswatcher identifies itself with its user
 agent. A disallowed URL is not fetched. The durable archive and outbound digest
 contain the LLM-written summary, source link, and metadata only. Raw article
-bodies are transient summary input and are neither archived nor sent.
+bodies are transient summary input, never sent and not in the article archive; they are
+kept only in the separate `bodies` store, and only when you opt in with `--store-body`
+(or `NEWSWATCHER_STORE_BODY`).
 
 ## 9. Scheduling
 

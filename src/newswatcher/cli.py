@@ -37,7 +37,7 @@ from newswatcher.schedule import (
 )
 from newswatcher.sources import Source, add_source, load_sources
 from newswatcher.state import read_state, write_state
-from newswatcher.store import FileStore
+from newswatcher.store import BodyStore, FileStore
 from newswatcher.stories import DEFAULT_THRESHOLD, group_stories
 from newswatcher.summarize import summarize_article
 from newswatcher.topics import Topic, add_topic, load_topics
@@ -48,6 +48,7 @@ _DIGEST_TO_ENV = "NEWSWATCHER_DIGEST_TO"
 _DIGEST_PUSH_ENV = "NEWSWATCHER_DIGEST_PUSH"
 _DEDUP_THRESHOLD_ENV = "NEWSWATCHER_DEDUP_THRESHOLD"
 _ARCHIVE_KEEP_DAYS_ENV = "NEWSWATCHER_ARCHIVE_KEEP_DAYS"
+_STORE_BODY_ENV = "NEWSWATCHER_STORE_BODY"
 _LLM_PROVIDER_ENV = "NEWSWATCHER_LLM_PROVIDER"
 _LLM_MODEL_ENV = "NEWSWATCHER_LLM_MODEL"
 
@@ -111,6 +112,36 @@ def _resolve_archive_keep_days() -> int | None:
     if value < 1:
         raise ConfigError(f"{_ARCHIVE_KEEP_DAYS_ENV} must be at least 1 day, got {value}")
     return value
+
+
+_TRUE_WORDS = frozenset({"1", "true", "yes", "on"})
+_FALSE_WORDS = frozenset({"0", "false", "no", "off"})
+
+
+def _resolve_store_body(args: argparse.Namespace) -> bool:
+    """Whether to capture each fetched body to the separate ``BodyStore``. The
+    ``--store-body`` flag wins; otherwise the ``NEWSWATCHER_STORE_BODY`` setting, read as a
+    boolean ("1"/"true"/"yes"/"on" or "0"/"false"/"no"/"off", case-insensitive). Off by
+    default -- the body stays transient unless the user opts in, so a poll keeps only the
+    summary and link.
+
+    Raises:
+        ConfigError: the setting is present but not a recognized boolean word -- caught
+            here so a typo ("treu") fails fast rather than silently disabling capture,
+            matching the sibling setting resolvers.
+    """
+    if args.store_body:
+        return True
+    raw = config.setting(_STORE_BODY_ENV)
+    if raw is None:
+        return False
+    value = raw.strip().lower()
+    if value in _TRUE_WORDS:
+        return True
+    if value in _FALSE_WORDS:
+        return False
+    raise ConfigError(f"{_STORE_BODY_ENV} must be a boolean "
+                      f"(1/true/yes/on or 0/false/no/off), got {raw!r}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -204,13 +235,14 @@ def _poll_once(args: argparse.Namespace) -> int:
     gate = default_gate()
     state = read_state()
     store = None if args.no_store else FileStore()
+    body_store = BodyStore() if _resolve_store_body(args) else None
     provider, model = _resolve_llm_choice(args)
     threshold = _resolve_dedup_threshold()   # validate up-front, before the poll spends the LLM
     keep_days = _resolve_archive_keep_days()   # ditto -- a bad value should not survive a poll
     summarize = functools.partial(summarize_article, provider=provider, model=model)
     with new_session() as session:   # one pooled connection for every fetch this poll
         report = poll_sources(sources, topics, gate=gate, state=state, store=store,
-                              session=session, summarize=summarize)
+                              body_store=body_store, session=session, summarize=summarize)
         heal_notes = (
             heal_empty_sources(sources, gate=gate, state=state, session=session,
                                provider=provider, model=model)
@@ -218,6 +250,8 @@ def _poll_once(args: argparse.Namespace) -> int:
         )
     for name, reason in report.skipped:
         print(f"newswatcher: skipping {name}: {reason}", file=sys.stderr)
+    for link, reason in report.body_failures:
+        print(f"newswatcher: body not stored for {link}: {reason}", file=sys.stderr)
     if not args.no_mail:
         email_to = args.to or config.setting(_DIGEST_TO_ENV)
         push_to = args.push or config.setting(_DIGEST_PUSH_ENV)
@@ -266,6 +300,7 @@ def _run_watch(args: argparse.Namespace) -> int:
     _resolve_llm_choice(args)
     _resolve_dedup_threshold()
     _resolve_archive_keep_days()
+    _resolve_store_body(args)
     read_state()
     print(f"watching every {every} min; Ctrl-C to stop", file=sys.stderr)
     next_tick = time.monotonic()
@@ -533,6 +568,11 @@ def _add_poll_flags(parser: argparse.ArgumentParser) -> None:
                         help="collect and archive but do not send the digest (email or chat)")
     parser.add_argument("--no-store", action="store_true", dest="no_store",
                         help="do not archive collected articles")
+    parser.add_argument("--store-body", action="store_true", dest="store_body",
+                        help="also keep each fetched article body in a separate local "
+                             "store (for re-summarizing or archiving the original text; "
+                             "never delivered). With --no-store the kept bodies have no "
+                             "matching archived article.")
     parser.add_argument("--no-heal", action="store_true", dest="no_heal",
                         help="do not run selector healing this poll")
     _add_llm_flags(parser)

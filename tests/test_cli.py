@@ -26,7 +26,7 @@ def test_watch_clamps_negative_sleep(monkeypatch):
 
     monkeypatch.setattr("time.sleep", _sleep)
     with pytest.raises(_Stop):
-        cli._run_watch(argparse.Namespace(every=None))
+        cli._run_watch(argparse.Namespace(every=None, store_body=False))
     assert slept == [0.0]   # clamped to zero, never negative
 
 
@@ -52,7 +52,7 @@ def test_watch_survives_a_transient_poll_error(monkeypatch):
     monkeypatch.setattr("time.monotonic", lambda: 0.0)
     monkeypatch.setattr("time.sleep", lambda s: None)
     with pytest.raises(_Stop):
-        cli._run_watch(argparse.Namespace(every=None))
+        cli._run_watch(argparse.Namespace(every=None, store_body=False))
     assert len(calls) == 2   # it continued to a 2nd poll after the 1st raised
 
 
@@ -716,3 +716,35 @@ def test_watch_ends_on_a_corrupt_state_file(monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "_run_poll", lambda a: ran.append(1))
     assert cli.main(["watch"]) == 1
     assert ran == []   # ended before the loop body ever ran
+
+
+def test_resolve_store_body_flag_short_circuits_the_setting(monkeypatch):
+    # The --store-body flag wins without even reading the setting, so a broken or garbage
+    # setting cannot interfere when the flag is set.
+    monkeypatch.setattr(cli.config, "setting",
+                        lambda name: pytest.fail("setting must not be read when --store-body is set"))
+    assert cli._resolve_store_body(argparse.Namespace(store_body=True)) is True
+
+
+def test_resolve_store_body_default_off_when_unset(monkeypatch):
+    monkeypatch.setattr(cli.config, "setting", lambda name: None)
+    assert cli._resolve_store_body(argparse.Namespace(store_body=False)) is False
+
+
+def test_resolve_store_body_reads_a_truthy_setting(monkeypatch):
+    for word in ("1", "true", "TRUE", "  yes ", "on"):
+        monkeypatch.setattr(cli.config, "setting", lambda name, w=word: w)
+        assert cli._resolve_store_body(argparse.Namespace(store_body=False)) is True
+
+
+def test_resolve_store_body_reads_a_falsy_setting(monkeypatch):
+    for word in ("0", "false", "No", "off"):
+        monkeypatch.setattr(cli.config, "setting", lambda name, w=word: w)
+        assert cli._resolve_store_body(argparse.Namespace(store_body=False)) is False
+
+
+def test_resolve_store_body_rejects_an_unrecognized_setting(monkeypatch):
+    from newswatcher.errors import ConfigError
+    monkeypatch.setattr(cli.config, "setting", lambda name: "treu")   # typo, not silently off
+    with pytest.raises(ConfigError):
+        cli._resolve_store_body(argparse.Namespace(store_body=False))
