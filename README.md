@@ -51,6 +51,9 @@ newswatcher poll --no-mail
 newswatcher articles
 ```
 
+If `articles` shows nothing, the poll just matched no new articles yet — that is normal, not an
+error; broaden the `--include` keywords or run `poll` again later.
+
 A topic matches on the feed's own language, so pair the keywords with the feed: English
 keywords for an English feed, Korean keywords for a Korean feed. `newswatcher topics` and
 `newswatcher sources` show what you registered.
