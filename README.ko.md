@@ -1,5 +1,10 @@
 # newswatcher
 
+[![check](https://github.com/seokhoonj/newswatcher/actions/workflows/check.yml/badge.svg)](https://github.com/seokhoonj/newswatcher/actions/workflows/check.yml)
+[![PyPI](https://img.shields.io/pypi/v/newswatcher)](https://pypi.org/project/newswatcher/)
+[![Python](https://img.shields.io/pypi/pyversions/newswatcher)](https://pypi.org/project/newswatcher/)
+[![License](https://img.shields.io/pypi/l/newswatcher)](https://github.com/seokhoonj/newswatcher/blob/main/LICENSE)
+
 [English](README.md) | **한국어**
 
 newswatcher는 RSS 피드와 robots 정책이 허용하는 목록 페이지를 확인하고, 새로운 기사를
@@ -10,7 +15,7 @@ newswatcher는 RSS 피드와 robots 정책이 허용하는 목록 페이지를 �
 정의하므로 같은 도구로 종목, 기술, 정책, 그 밖에 피드가 다루는 어떤 주제든 추적할 수
 있습니다.
 
-## 설치
+## 1. 설치
 
 newswatcher는 Python 3.11 이상이 필요합니다. 코어(수집·요약·아카이브)는 단독으로 설치되고,
 발송은 선택 사항이라 원하는 채널만 추가합니다:
@@ -24,7 +29,7 @@ pip install "newswatcher[all]"     # + 둘 다
 
 아래 빠른 시작은 이메일로 다이제스트를 보내므로 `newswatcher[email]`이 필요합니다.
 
-## 빠른 시작
+## 2. 빠른 시작
 
 토픽과 RSS 소스를 등록하고, 다이제스트 수신 주소와 기본 Gemini LLM provider
 (LLM 서비스를 제공하는 업체)용 API 키를 설정한 다음 한 번 poll을 실행합니다.
@@ -44,7 +49,7 @@ newswatcher poll
 `newswatcher topics`와 `newswatcher sources`로 등록 내용을 확인할 수 있습니다. 전체
 명령과 옵션은 `newswatcher --help` 또는 `newswatcher <command> --help`에서 확인합니다.
 
-## 명령
+## 3. 명령
 
 전체 옵션은 `newswatcher --help` 또는 `newswatcher <command> --help`에서 확인하고,
 `newswatcher --version`은 버전을 출력합니다.
@@ -65,7 +70,7 @@ newswatcher poll
 | `heal [--dry-run] [--provider P] [--model M]` | selector가 끊긴 crawl 소스를 점검해 LLM으로 복구(라이브 페이지로 검증). `--dry-run`은 제안만 보고 쓰지 않음. |
 | `schedule install\|status\|remove [--every N]` | 반복 poll을 OS 스케줄러에 설치·조회·제거(Linux/macOS는 cron, Windows는 schtasks). `--every N`으로 간격 설정. |
 
-## 전송
+## 4. 전송
 
 다이제스트는 이메일, 채팅, 또는 둘 다로 보낼 수 있습니다. 원하는 대상을 하나 이상
 설정합니다. 각 채널은 선택 extra(`newswatcher[email]` / `newswatcher[chat]`)이고, 동반
@@ -86,7 +91,7 @@ mailmail, 챗 토큰은 pushpush에 — 각 도구를 단독으로 쓸 때와 �
 `newswatcher setup`으로 한 번에 안내식으로 설정하고, `newswatcher doctor`로 무엇이 어디에
 설정돼 있는지 전체 지도를 확인합니다.
 
-## 뉴스 피드
+## 5. 뉴스 피드
 
 유효한 RSS/Atom 피드는 무엇이든 소스가 됩니다. 아래는 검증된 국내 피드의 대표
 목록이고, 섹션별로 나누고 검증 시점에 살아 있던 피드를 표시한 전체 목록은
@@ -122,7 +127,7 @@ mailmail, 챗 토큰은 pushpush에 — 각 도구를 단독으로 쓸 때와 �
 | The Verge | IT | `https://www.theverge.com/rss/index.xml` |
 | Nature | 과학 | `https://www.nature.com/nature.rss` |
 
-## 설정 파일
+## 6. 설정 파일
 
 newswatcher는 직접 편집하는 설정을 `$XDG_CONFIG_HOME/newswatcher`에 저장합니다.
 `XDG_CONFIG_HOME`이 없으면 `~/.config/newswatcher`를 사용합니다. CLI도 같은 파일을
@@ -181,7 +186,7 @@ archive는 기본적으로 아무것도 지우지 않습니다. 오래된 기록
 poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다. 미설정이면 무한 보관합니다
 (이 삭제는 되돌릴 수 없으니 의도적으로만 켜세요).
 
-## provider 키와 모델
+## 7. provider 키와 모델
 
 LLM provider 키는 비밀이며, newswatcher가 아니라 요약에 쓰는 thinchat 라이브러리의
 저장소에 있습니다. `setup`(이메일·챗까지 같은 패스에서 설정) 또는 키만 넣는 `set-key`로
@@ -217,7 +222,7 @@ credbox migrate --from-app newswatcher --to-app thinchat --remove-source
 
 `newswatcher setup`은 예전 위치에 키가 남아 있으면 이 명령을 출력합니다.
 
-## 책임 있는 수집
+## 8. 책임 있는 수집
 
 모든 피드, 목록 페이지, 기사 요청은 전송 전에 사이트의 robots 정책을 확인하며
 newswatcher의 user agent (HTTP 요청에서 프로그램을 식별하는 문자열)를 보냅니다.
@@ -225,7 +230,7 @@ newswatcher의 user agent (HTTP 요청에서 프로그램을 식별하는 문자
 요약, 원문 링크, 메타데이터만 들어갑니다. 원문 본문은 일시적인 요약 입력으로만 쓰며
 archive하거나 발송하지 않습니다.
 
-## 스케줄링
+## 9. 스케줄링
 
 30분마다 실행하는 반복 poll을 운영체제 스케줄러(정해진 시각에 명령을 실행하는
 OS 기능)에 설치합니다.
@@ -261,7 +266,7 @@ poll은 단일 인스턴스 lock을 잡으므로 예약 poll과 수동 poll이 �
 나중에 시작한 쪽은 이미 poll이 실행 중이라고 알리고 종료합니다. lock은 Linux·macOS에서
 `flock`, Windows에서 `msvcrt`를 씁니다.
 
-## AI 코딩 에이전트에서 사용
+## 10. AI 코딩 에이전트에서 사용
 
 이 저장소에는 `poll` skill이 있습니다: "뉴스 확인해줘", "내 newswatcher 폴 돌려줘"처럼
 말하면 한 번 poll을 실행하고 결과를 전달합니다.
@@ -300,3 +305,7 @@ ln -s "$PWD/plugins/newswatcher/skills/poll" ~/.codex/skills/poll    # Codex →
 ```
 
 Claude Code는 바로 인식하고, Codex는 재시작해야 로딩됩니다.
+
+## 11. 라이선스
+
+[MIT](LICENSE)
