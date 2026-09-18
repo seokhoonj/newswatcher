@@ -12,12 +12,13 @@ description     = "Collect topic-matched articles from RSS and robots-permitted 
 readme          = "README.md"
 license         = "MIT"
 license-files   = ["LICENSE"]
-authors         = [{ name = "seokhoonj", email = "seokhoonj@gmail.com" }]
+authors         = [{ name = "Seokhoon Joo", email = "seokhoonj@gmail.com" }]
 keywords        = ["news", "rss", "crawl", "watch", "digest", "topics", "email"]
 classifiers     = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -25,6 +26,7 @@ classifiers     = [
     "Programming Language :: Python :: 3.14",
     "Topic :: Internet",
     "Topic :: Communications :: Email",
+    "Typing :: Typed",
 ]
 requires-python = ">=3.11"
 dependencies    = [
@@ -50,8 +52,13 @@ Issues     = "https://github.com/seokhoonj/newswatcher/issues"
 email = ["mailmail>=0.4.2"]
 chat = ["pushpush>=0.3.1"]
 all = ["newswatcher[email,chat]"]
+
+[dependency-groups]
+# Dev tooling plus both delivery packages, so the suite exercises email and chat. A group
+# (PEP 735), not a published extra, so it never appears in the distribution's Provides-Extra.
 dev = [
-    "newswatcher[all]",   # the suite exercises both delivery channels
+    "mailmail>=0.4.2",
+    "pushpush>=0.3.1",
     "mypy>=1.11",
     "pytest>=8.0",
     "ruff>=0.6",
