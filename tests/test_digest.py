@@ -330,3 +330,29 @@ def test_send_digest_funnels_a_too_old_mailmail(monkeypatch):
     monkeypatch.setattr(digest, "render_html_digest", _too_old)
     with pytest.raises(DigestError):
         send_digest((_story("a", "t"),), email_to="you@e.com")
+
+
+def test_send_digest_reports_the_missing_email_extra(monkeypatch):
+    # email delivery without newswatcher[email]: the absent mailmail import funnels to a DigestError
+    # that names the extra to install, rather than escaping as a raw ImportError.
+    import sys
+
+    import pytest
+
+    from newswatcher.errors import DigestError
+
+    monkeypatch.setitem(sys.modules, "mailmail", None)   # `import mailmail` raises ImportError
+    with pytest.raises(DigestError, match=r"newswatcher\[email\]"):
+        send_digest((_story("a", "t"),), email_to="you@e.com")
+
+
+def test_send_digest_reports_the_missing_chat_extra(monkeypatch):
+    import sys
+
+    import pytest
+
+    from newswatcher.errors import DigestError
+
+    monkeypatch.setitem(sys.modules, "pushpush", None)
+    with pytest.raises(DigestError, match=r"newswatcher\[chat\]"):
+        send_digest((_story("a", "t"),), push_to="alerts")

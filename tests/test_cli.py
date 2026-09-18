@@ -228,6 +228,29 @@ def test_setup_continues_after_one_channel_fails(monkeypatch, tmp_path, capsys):
     assert "first" in capsys.readouterr().err   # the failure was reported
 
 
+def test_doctor_shows_a_not_installed_channel(monkeypatch, tmp_path, capsys):
+    # A delivery extra that is not installed shows as "not installed" with an install hint, and
+    # does NOT count toward the non-zero exit (it is a deliberate opt-out, like an unconfigured one).
+    import sys
+
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    import thinchat
+    thinchat.set_api_key("gemini", value="k")            # LLM set, so exit hinges on delivery
+    monkeypatch.setitem(sys.modules, "mailmail", None)   # newswatcher[email] absent
+    assert cli.main(["doctor"]) == 0
+    out = capsys.readouterr().out
+    assert "not installed" in out and "pip install newswatcher[email]" in out
+
+
+def test_mark_by_state_covers_every_channel_state():
+    # doctor indexes _MARK_BY_STATE by the channel's state; a new ChannelState member without a
+    # mark would KeyError at runtime. Pin the coverage so it fails at test time instead.
+    from newswatcher.credentials import ChannelState
+
+    assert set(cli._MARK_BY_STATE) == set(ChannelState)
+
+
 def test_doctor_never_prints_the_stored_secret(monkeypatch, tmp_path, capsys):
     _xdg(monkeypatch, tmp_path)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)

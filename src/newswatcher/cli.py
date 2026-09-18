@@ -339,7 +339,7 @@ def _run_setup(args: argparse.Namespace) -> int:
     for channel in credentials.channels(provider):
         if channel.state is ChannelState.SET:
             print(f"  {channel.label}: already set ({channel.location})")
-        elif channel.state is ChannelState.UNCONFIGURED:
+        elif channel.state in (ChannelState.UNCONFIGURED, ChannelState.NOT_INSTALLED):
             print(f"  {channel.label}: {channel.detail}")
         elif channel.state is ChannelState.ERROR:
             print(f"  {channel.label}: store unreadable -- {channel.detail}", file=sys.stderr)
@@ -376,7 +376,7 @@ def _run_doctor(args: argparse.Namespace) -> int:
     print("credentials")
     n_unhealthy = 0
     for channel in credentials.channels(provider):
-        line = f"  {channel.label:<26} {_MARK_BY_STATE[channel.state]:<9} {channel.location}"
+        line = f"  {channel.label:<26} {_MARK_BY_STATE[channel.state]:<13} {channel.location}"
         if channel.state is ChannelState.MISSING:
             line += "  (run: newswatcher setup)"
         elif channel.detail:   # UNCONFIGURED hint or ERROR text
@@ -388,7 +388,7 @@ def _run_doctor(args: argparse.Namespace) -> int:
     for name in ("config.toml", "sources.toml", "topics.toml"):
         path = config.config_dir() / name
         mark = "present" if path.exists() else "absent"
-        print(f"  {name:<26} {mark:<9} {credentials.display_path(path)}")
+        print(f"  {name:<26} {mark:<13} {credentials.display_path(path)}")   # width matches the channel rows
     return 1 if n_unhealthy else 0
 
 
@@ -423,6 +423,7 @@ _MARK_BY_STATE = {
     ChannelState.SET: "set",
     ChannelState.MISSING: "not set",
     ChannelState.UNCONFIGURED: "no config",
+    ChannelState.NOT_INSTALLED: "not installed",
     ChannelState.ERROR: "error",
 }
 

@@ -4,9 +4,10 @@ One digest per poll: the new stories grouped by topic, each entry showing the le
 title, our LLM summary, and the source link — never the article's own text. Any selector
 repairs the healer made this run are appended so the change is visible. This module
 renders the message once and hands it to a delivery package — mailmail for email,
-pushpush for chat, both base dependencies — so 'how to send' lives in one place per
-channel. Each is imported lazily, so importing this module pulls in neither until a send
-on that channel happens."""
+pushpush for chat, each an optional extra (`newswatcher[email]` / `newswatcher[chat]`) —
+so 'how to send' lives in one place per channel. Each is imported lazily, so importing this
+module pulls in neither, and a *send* on a channel whose extra is not installed fails with a
+clear `DigestError` rather than an import error."""
 
 from __future__ import annotations
 
@@ -221,12 +222,12 @@ def _load_mailmail() -> _MailmailModule:
     try:
         import mailmail
     except ImportError as err:
-        # Funnel any import failure -- the package absent OR a broken sub-dependency -- to
-        # DigestError, so a send never escapes as a raw ImportError past the caller. The message
-        # stays generic rather than claiming "not installed", which a sub-dependency failure is not.
+        # Funnel any import failure to DigestError so a send never escapes as a raw ImportError.
+        # mailmail is the optional newswatcher[email] extra, so the likely cause is that it was not
+        # installed -- point there, while the interpolated error still shows a sub-dependency fault.
         raise DigestError(
-            f"the mailmail package could not be imported ({err}); "
-            f"reinstall or repair newswatcher's dependencies"
+            f"email delivery needs the mailmail package ({err}); "
+            f"install it with 'pip install newswatcher[email]'"
         ) from err
     return cast(_MailmailModule, mailmail)
 
@@ -235,8 +236,9 @@ def _load_pushpush() -> _PushpushModule:
     try:
         import pushpush
     except ImportError as err:
+        # pushpush is the optional newswatcher[chat] extra; funnel the failure and point at it.
         raise DigestError(
-            f"the pushpush package could not be imported ({err}); "
-            f"reinstall or repair newswatcher's dependencies"
+            f"chat delivery needs the pushpush package ({err}); "
+            f"install it with 'pip install newswatcher[chat]'"
         ) from err
     return cast(_PushpushModule, pushpush)

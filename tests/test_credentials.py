@@ -177,6 +177,30 @@ def test_email_channel_reports_error_without_leaking_the_store_message(monkeypat
     assert secret_ish not in (email.detail or "")   # the tool's message is never rendered
 
 
+def test_email_channel_reports_not_installed(monkeypatch):
+    # mailmail is the optional newswatcher[email] extra; if it is not installed the channel is
+    # NOT_INSTALLED with an install hint, and channels() (and the CLI that reads it) still work.
+    import sys
+
+    _no_provider_key(monkeypatch)
+    monkeypatch.setitem(sys.modules, "mailmail", None)   # `import mailmail` now raises ImportError
+    email = next(c for c in credentials.channels("ollama") if c.tool == "mailmail")
+    assert email.state is ChannelState.NOT_INSTALLED
+    assert email.setter is None
+    assert "pip install newswatcher[email]" in (email.detail or "")
+
+
+def test_chat_channel_reports_not_installed(monkeypatch):
+    import sys
+
+    _no_provider_key(monkeypatch)
+    monkeypatch.setitem(sys.modules, "pushpush", None)
+    chat = next(c for c in credentials.channels("ollama") if c.tool == "pushpush")
+    assert chat.state is ChannelState.NOT_INSTALLED
+    assert chat.setter is None
+    assert "pip install newswatcher[chat]" in (chat.detail or "")
+
+
 def test_email_unconfigured_when_the_config_is_absent(monkeypatch):
     import mailmail
 
