@@ -76,7 +76,8 @@ def heal_source(
         FetchError: the listing could not be fetched (propagated).
         LLMError: the provider is unknown, no API key is available, or the client could not be
             built (propagated from ``propose_selectors``).
-        HealError: the LLM proposal could not be obtained or parsed.
+        HealError: the listing cannot be fetched for lack of a robots gate, or the LLM proposal
+            could not be obtained or parsed.
         SourceError: the source's own existing selector is malformed (the health check cannot
             run), or the repaired selectors could not be written -- propagated from
             ``extract_items`` or ``update_selectors``.

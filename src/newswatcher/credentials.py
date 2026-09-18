@@ -134,9 +134,8 @@ def _email_channels() -> list[Channel]:
     installed (the optional ``newswatcher[email]`` extra) -> a single ``NOT_INSTALLED`` channel."""
     try:
         import mailmail
-    except ImportError:
-        return [Channel("email", "mailmail", "-", ChannelState.NOT_INSTALLED,
-                        detail="add it with 'pip install newswatcher[email]'")]
+    except ImportError as err:
+        return [_optional_tool_channel("email", "mailmail", err)]
     location = _store_location("mailmail")
     try:
         mail_config = mailmail.load_config()
@@ -174,9 +173,8 @@ def _chat_channels() -> list[Channel]:
     ``newswatcher[chat]`` extra) -> a single ``NOT_INSTALLED`` channel."""
     try:
         import pushpush
-    except ImportError:
-        return [Channel("chat", "pushpush", "-", ChannelState.NOT_INSTALLED,
-                        detail="add it with 'pip install newswatcher[chat]'")]
+    except ImportError as err:
+        return [_optional_tool_channel("chat", "pushpush", err)]
     location = _store_location("pushpush")
     try:
         push_config = pushpush.load_config()
@@ -204,6 +202,20 @@ def _chat_channels() -> list[Channel]:
         else:
             result.append(Channel(label, "pushpush", location, ChannelState.SET))
     return result
+
+
+def _optional_tool_channel(label: str, tool: str, err: ImportError) -> Channel:
+    """Classify a failed lazy import of an optional delivery package. Genuinely absent -- a
+    ``ModuleNotFoundError`` naming the package itself -- is ``NOT_INSTALLED`` with an install hint
+    (a deliberate opt-out ``doctor`` does not count). Any other import failure (a broken transitive
+    dependency, an error raised inside the package's import) is ``ERROR``: the extra is installed but
+    unusable, which ``doctor`` counts, so a broken install is not mistaken for a healthy opt-out.
+    ``label`` doubles as the extra name (``email`` -> ``newswatcher[email]``)."""
+    if isinstance(err, ModuleNotFoundError) and err.name == tool:
+        return Channel(label, tool, "-", ChannelState.NOT_INSTALLED,
+                       detail=f"add it with 'pip install newswatcher[{label}]'")
+    return Channel(label, tool, "-", ChannelState.ERROR,
+                   detail=f"the {tool} package is installed but could not be imported")
 
 
 def _put_llm_key(provider: str, value: str) -> None:
@@ -248,12 +260,14 @@ def _store_location(app: str) -> str:
     """Where ``app``'s secrets actually live, as credbox's own secret-free description -- the real
     backend's file path or keyring service, honoring the resolved binding, rather than assuming a
     plaintext ``credentials.json`` (which would misreport an encrypted or keyring store). Home is
-    collapsed to ``~``; a best-effort default if the binding cannot be resolved (the string is shown
-    to the user, never read here)."""
+    collapsed to ``~``. If credbox cannot resolve the binding, return a neutral ``-`` rather than a
+    reconstructed path -- a guessed ``~/.config/{app}/credentials.json`` would be wrong under a
+    redirect, a namespace, or an encrypted/keyring backend, which is exactly what asking credbox for
+    the location avoids. The string is shown to the user, never read here."""
     try:
         return _collapse_home(credbox.Credentials.for_app(app).store_location())
     except credbox.CredBoxError:
-        return f"~/.config/{app}/credentials.json"
+        return "-"
 
 
 def _collapse_home(location: str) -> str:

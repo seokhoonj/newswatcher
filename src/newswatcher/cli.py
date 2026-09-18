@@ -309,9 +309,10 @@ def _run_heal(args: argparse.Namespace) -> int:
 
 
 def _run_set_key(args: argparse.Namespace) -> int:
-    """Store an LLM provider's API key with thinchat (prompted without echo, written at mode 0600).
-    The key value is never printed. ``setup`` writes the key to the same place; this is the
-    key-only command for a user who does not need the full setup pass."""
+    """Store an LLM provider's API key with thinchat, prompted without echo (the at-rest storage is
+    thinchat's own credential store -- a file, keyring, or encrypted backend, as thinchat is
+    configured). The key value is never printed. ``setup`` writes the key to the same place; this is
+    the key-only command for a user who does not need the full setup pass."""
     provider = args.provider
     validate_provider(provider)   # reject a typo before prompting for the key
     if provider_key_name(provider) is None:

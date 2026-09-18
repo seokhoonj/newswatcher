@@ -53,7 +53,7 @@ newswatcher poll
 | `topics` | 정의된 토픽을 include / exclude 키워드와 함께 나열. |
 | `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | 소스 등록 — RSS 피드(`--kind rss`) 또는 robots 허용 크롤 페이지(`--kind crawl`) — 와 테스트할 `--topic`들. crawl 소스는 selector 필요: `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 소스의 모든 기사 보관(피드 전체가 온토픽인 전문지용). |
 | `sources` | 등록된 소스를 kind·URL·토픽과 함께 나열. |
-| `set-key <provider>` | LLM provider의 API 키를 에코 없이 입력받아 thinchat 저장소(mode 0600)에 저장. provider는 `gemini`·`openai`·`claude`; 키는 같은 이름의 `*_API_KEY` 환경 변수에서도 읽으며 그쪽이 우선. |
+| `set-key <provider>` | LLM provider의 API 키를 에코 없이 입력받아 thinchat 자체 자격증명 저장소에 저장. provider는 `gemini`·`openai`·`claude`; 키는 같은 이름의 `*_API_KEY` 환경 변수에서도 읽으며 그쪽이 우선. |
 | `setup [--provider P]` | 각 채널의 빠진 비밀을 한 번의 안내식 패스로 채움 — LLM 키는 thinchat, 이메일 비번은 mailmail, 챗 토큰은 pushpush에. 에코 없이 입력받고 각각 어디에 저장됐는지 출력. 이미 설정된 것은 건너뛰고, 계정·라우트가 아직 없는 채널은 해당 도구로 안내. |
 | `doctor [--provider P]` | 각 비밀과 설정 파일이 어디 있고 설정됐는지를 비밀 값 출력 없이 표시. 설정된 채널에 비밀이 없거나 저장소를 읽을 수 없으면 non-zero로 종료하므로, 예약 실행이 설정 완료 여부를 게이트로 쓸 수 있음. |
 | `recent <url> [--limit N]` | 피드 최신 항목(제목+링크)을 저장·요약 없이 출력 — 등록 전 URL 확인용. `--limit N`으로 개수 제한. |
@@ -183,7 +183,7 @@ poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다
 
 LLM provider 키는 비밀이며, newswatcher가 아니라 요약에 쓰는 thinchat 라이브러리의
 저장소에 있습니다. `setup`(이메일·챗까지 같은 패스에서 설정) 또는 키만 넣는 `set-key`로
-한 번 저장하며, 둘 다 에코 없이 입력받아 thinchat 저장소(mode 0600)에 씁니다.
+한 번 저장하며, 둘 다 에코 없이 입력받아 thinchat 자체 자격증명 저장소에 씁니다.
 
 ```sh
 newswatcher setup            # LLM 키 + 이메일 + 챗을 한 번에

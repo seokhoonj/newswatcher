@@ -251,6 +251,42 @@ def test_mark_by_state_covers_every_channel_state():
     assert set(cli._MARK_BY_STATE) == set(ChannelState)
 
 
+def test_doctor_reports_an_unreadable_store_as_error_without_leaking(monkeypatch, tmp_path, capsys):
+    # An unreadable store makes the channel ERROR (counted -> exit 1); the mark shows "error" and
+    # the tool's (possibly secret-bearing) message is never rendered.
+    import thinchat
+    from thinchat.errors import ThinchatError
+
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    sentinel = "SENTINEL-store-detail"
+
+    def boom(provider, **kwargs):
+        raise ThinchatError(sentinel)
+
+    monkeypatch.setattr(thinchat, "get_api_key", boom)
+    assert cli.main(["doctor"]) == 1
+    captured = capsys.readouterr()
+    assert "error" in captured.out
+    assert sentinel not in captured.out and sentinel not in captured.err
+
+
+def test_set_key_reports_a_storage_failure_without_leaking(monkeypatch, tmp_path, capsys):
+    import thinchat
+    from thinchat.errors import ThinchatError
+
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.setattr("getpass.getpass", lambda prompt="": "SENTINEL-typed-key")
+
+    def boom(provider, *, value):
+        raise ThinchatError("store write failed")   # scrubbed: no key
+
+    monkeypatch.setattr(thinchat, "set_api_key", boom)
+    assert cli.main(["set-key", "gemini"]) == 1   # storage failure -> LLMError -> exit 1
+    captured = capsys.readouterr()
+    assert "SENTINEL-typed-key" not in captured.out and "SENTINEL-typed-key" not in captured.err
+
+
 def test_doctor_never_prints_the_stored_secret(monkeypatch, tmp_path, capsys):
     _xdg(monkeypatch, tmp_path)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
