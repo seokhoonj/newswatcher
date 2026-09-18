@@ -27,7 +27,7 @@ pip install "newswatcher[chat]"    # + 챗 다이제스트 (pushpush)
 pip install "newswatcher[all]"     # + 둘 다
 ```
 
-아래 빠른 시작은 이메일로 다이제스트를 보내므로 `newswatcher[email]`이 필요합니다.
+아래 빠른 시작은 코어 `newswatcher`만 있으면 됩니다 — 이메일·챗은 나중에(전송) 추가합니다.
 
 ## 2. 빠른 시작
 
@@ -196,7 +196,17 @@ poll이 다이제스트 발송 후 그보다 오래된 기사를 삭제합니다
 
 ## 7. provider 키와 모델
 
-LLM provider 키는 비밀이며, newswatcher가 아니라 요약에 쓰는 thinchat 라이브러리의
+**provider**는 요약을 작성하는 LLM 서비스입니다. newswatcher는 네 곳을 지원하며, 왼쪽 열의
+이름을 `--provider`나 `set-key`에 넘깁니다:
+
+| provider | 키(환경 변수) | 키 발급처 |
+|----------|---------------|-----------|
+| `gemini` (기본) | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) — 무료 티어 |
+| `openai` | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com/api-keys) |
+| `claude` | `CLAUDE_API_KEY` | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| `ollama` | — (로컬 실행) | 키 불필요 |
+
+provider 키는 비밀이며, newswatcher가 아니라 요약에 쓰는 thinchat 라이브러리의
 저장소에 있습니다. `setup`(이메일·챗까지 같은 패스에서 설정) 또는 키만 넣는 `set-key`로
 한 번 저장하며, 둘 다 에코 없이 입력받아 thinchat 자체 자격증명 저장소에 씁니다.
 
@@ -205,11 +215,10 @@ newswatcher setup            # LLM 키 + 이메일 + 챗을 한 번에
 newswatcher set-key gemini   # LLM 키만
 ```
 
-각 키는 표준 환경 변수(`GEMINI_API_KEY`·`OPENAI_API_KEY`·`CLAUDE_API_KEY`)에서도 읽으며
-환경 변수가 우선하므로, 아무것도 저장하지 않고 일회성으로 키를 넣을 수 있습니다.
+각 키는 위 표의 환경 변수에서도 읽으며 환경 변수가 우선하므로, 아무것도 저장하지 않고
+일회성으로 키를 넣을 수 있습니다.
 
-newswatcher는 기본적으로 Gemini 무료 티어로 요약합니다 — 무료 키는
-[Google AI Studio](https://aistudio.google.com/apikey)에서 발급합니다. 다른 provider(그리고 원하면
+newswatcher는 기본적으로 Gemini 무료 티어로 요약합니다. 다른 provider(그리고 원하면
 특정 모델)는 `--provider` / `--model`로 고르거나, `NEWSWATCHER_LLM_PROVIDER` /
 `NEWSWATCHER_LLM_MODEL` 설정(`config.toml`의 `llm_provider`, `llm_model`)으로
 지속 지정합니다.
@@ -218,18 +227,6 @@ newswatcher는 기본적으로 Gemini 무료 티어로 요약합니다 — 무�
 newswatcher poll --provider claude --model claude-sonnet-5
 export NEWSWATCHER_LLM_PROVIDER=openai
 ```
-
-### 예전 newswatcher에서 키 옮기기
-
-이전 버전은 LLM 키를 newswatcher 자체 `credentials.json`에 보관했습니다. 이제
-newswatcher는 그 파일을 읽지 않으니, 키를 thinchat 저장소로 한 번 옮기면(키 이름이 이미
-동일합니다) 예전 파일은 지워도 됩니다.
-
-```sh
-credbox migrate --from-app newswatcher --to-app thinchat --remove-source
-```
-
-`newswatcher setup`은 예전 위치에 키가 남아 있으면 이 명령을 출력합니다.
 
 ## 8. 책임 있는 수집
 
