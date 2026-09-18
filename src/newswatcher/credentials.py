@@ -22,10 +22,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import credbox
-import mailmail
-import pushpush
 import thinchat
 
+# mailmail and pushpush are optional extras (newswatcher[email] / newswatcher[chat]), so they are
+# imported lazily inside the channel builders -- importing this module (and the CLI that reads it)
+# must not require a delivery package the user did not install.
 from newswatcher._llm import provider_key_name, validate_provider
 from newswatcher.errors import ConfigError
 
@@ -36,11 +37,13 @@ class ChannelState(enum.Enum):
     """Where a channel's secret stands. ``SET`` -- it resolves (an env var or the tool's store);
     ``MISSING`` -- the config entity exists but no secret does, so ``setup`` can fill it;
     ``UNCONFIGURED`` -- the tool has no such entity yet, so it is configured with the tool first;
+    ``NOT_INSTALLED`` -- the channel's optional package is not installed (delivery is opt-in);
     ``ERROR`` -- the tool's store could not be read (a content-free message, never the secret)."""
 
     SET = "set"
     MISSING = "missing"
     UNCONFIGURED = "unconfigured"
+    NOT_INSTALLED = "not_installed"
     ERROR = "error"
 
 
@@ -127,8 +130,13 @@ def _llm_channel(provider: str) -> Channel:
 
 def _email_channels() -> list[Channel]:
     """One channel per configured mailmail sender account: whether its SMTP password resolves, and
-    how to store one. No account configured -> a single ``UNCONFIGURED`` channel pointing at
-    mailmail."""
+    how to store one. No account configured -> a single ``UNCONFIGURED`` channel; mailmail not
+    installed (the optional ``newswatcher[email]`` extra) -> a single ``NOT_INSTALLED`` channel."""
+    try:
+        import mailmail
+    except ImportError:
+        return [Channel("email", "mailmail", "-", ChannelState.NOT_INSTALLED,
+                        detail="add it with 'pip install newswatcher[email]'")]
     location = _store_location("mailmail")
     try:
         mail_config = mailmail.load_config()
@@ -162,7 +170,13 @@ def _email_channels() -> list[Channel]:
 
 def _chat_channels() -> list[Channel]:
     """One channel per configured pushpush route: whether its token resolves, and how to store one.
-    No route configured -> a single ``UNCONFIGURED`` channel pointing at pushpush."""
+    No route configured -> a single ``UNCONFIGURED`` channel; pushpush not installed (the optional
+    ``newswatcher[chat]`` extra) -> a single ``NOT_INSTALLED`` channel."""
+    try:
+        import pushpush
+    except ImportError:
+        return [Channel("chat", "pushpush", "-", ChannelState.NOT_INSTALLED,
+                        detail="add it with 'pip install newswatcher[chat]'")]
     location = _store_location("pushpush")
     try:
         push_config = pushpush.load_config()

@@ -11,11 +11,17 @@ a feed covers.
 
 ## Install
 
-newswatcher requires Python 3.11 or newer.
+newswatcher requires Python 3.11 or newer. The core — collect, summarize, archive — installs on
+its own; delivery is opt-in, so add the channel you want:
 
 ```sh
-pip install newswatcher
+pip install newswatcher            # core: collect, summarize, archive (read with `articles`)
+pip install "newswatcher[email]"   # + email digests, via mailmail
+pip install "newswatcher[chat]"    # + chat digests, via pushpush
+pip install "newswatcher[all]"     # + both
 ```
+
+The Quickstart below emails a digest, so it needs `newswatcher[email]`.
 
 ## Quickstart
 
@@ -61,16 +67,18 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 ## Delivery
 
 The digest is sent by email, to a chat channel, or both — set one or both destinations.
-Both channels are handled by companion packages that install alongside newswatcher, and each
-keeps its own credentials, so newswatcher never stores your email password or bot token.
+Each channel is an opt-in extra (`newswatcher[email]` / `newswatcher[chat]`); its companion
+package keeps its own credentials, so newswatcher never stores your email password or bot token.
+Without either extra, newswatcher still collects, summarizes, and archives — read the archive with
+`newswatcher articles`.
 
-- Email goes through the mailmail package. Set up an account (or an address-book alias) once
-  with mailmail's own CLI (`mailmail --help`); then `--to ADDRESS`, or the
+- Email goes through the mailmail package (`newswatcher[email]`). Set up an account (or an
+  address-book alias) once with mailmail's own CLI (`mailmail --help`); then `--to ADDRESS`, or the
   `NEWSWATCHER_DIGEST_TO` setting, names that alias or a plain address.
-- Chat goes through the pushpush package. Configure a route (a bot plus its destination —
-  Telegram, Slack, or Discord) once with pushpush's own CLI (`pushpush --help`); then
-  `--push ROUTE`, or the `NEWSWATCHER_DIGEST_PUSH` setting, names that route. The digest is
-  sent as one markdown message.
+- Chat goes through the pushpush package (`newswatcher[chat]`). Configure a route (a bot plus its
+  destination — Telegram, Slack, or Discord) once with pushpush's own CLI (`pushpush --help`); then
+  `--push ROUTE`, or the `NEWSWATCHER_DIGEST_PUSH` setting, names that route. The digest is sent as
+  one markdown message.
 
 So newswatcher holds no secret of its own: the LLM key lives with thinchat, the email password
 with mailmail, the chat token with pushpush — each in its own store, exactly as when the tool is

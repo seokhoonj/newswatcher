@@ -10,11 +10,17 @@ newswatcher는 RSS 피드와 robots 정책이 허용하는 목록 페이지를 �
 
 ## 설치
 
-newswatcher는 Python 3.11 이상이 필요합니다.
+newswatcher는 Python 3.11 이상이 필요합니다. 코어(수집·요약·아카이브)는 단독으로 설치되고,
+발송은 선택 사항이라 원하는 채널만 추가합니다:
 
 ```sh
-pip install newswatcher
+pip install newswatcher            # 코어: 수집·요약·아카이브 (articles로 조회)
+pip install "newswatcher[email]"   # + 이메일 다이제스트 (mailmail)
+pip install "newswatcher[chat]"    # + 챗 다이제스트 (pushpush)
+pip install "newswatcher[all]"     # + 둘 다
 ```
+
+아래 빠른 시작은 이메일로 다이제스트를 보내므로 `newswatcher[email]`이 필요합니다.
 
 ## 빠른 시작
 
@@ -60,17 +66,18 @@ newswatcher poll
 ## 전송
 
 다이제스트는 이메일, 채팅, 또는 둘 다로 보낼 수 있습니다. 원하는 대상을 하나 이상
-설정합니다. 두 채널 모두 newswatcher와 함께 설치되는 동반 패키지가 처리하며, 각자 자기
-자격증명을 자기 저장소에 관리하므로 newswatcher는 당신의 이메일 비번이나 봇 토큰을
-저장하지 않습니다.
+설정합니다. 각 채널은 선택 extra(`newswatcher[email]` / `newswatcher[chat]`)이고, 동반
+패키지가 각자 자기 자격증명을 자기 저장소에 관리하므로 newswatcher는 당신의 이메일 비번이나
+봇 토큰을 저장하지 않습니다. 둘 다 없어도 수집·요약·아카이브는 되며, 아카이브는
+`newswatcher articles`로 봅니다.
 
-- 이메일은 mailmail 패키지로 보냅니다. 계정(또는 주소록 별칭)을 mailmail 자체 CLI
-  (`mailmail --help`)로 한 번 설정한 뒤, `--to ADDRESS`(또는 `NEWSWATCHER_DIGEST_TO` 설정)로
-  그 별칭이나 일반 주소를 지정합니다.
-- 채팅은 pushpush 패키지로 보냅니다. 라우트(봇 + 목적지 — 텔레그램·슬랙·디스코드)를
-  pushpush 자체 CLI(`pushpush --help`)로 한 번 설정한 뒤, `--push ROUTE`(또는
-  `NEWSWATCHER_DIGEST_PUSH` 설정)로 그 라우트를 지정합니다. 다이제스트는 markdown 메시지
-  한 통으로 전송됩니다.
+- 이메일은 mailmail 패키지(`newswatcher[email]`)로 보냅니다. 계정(또는 주소록 별칭)을 mailmail
+  자체 CLI(`mailmail --help`)로 한 번 설정한 뒤, `--to ADDRESS`(또는 `NEWSWATCHER_DIGEST_TO`
+  설정)로 그 별칭이나 일반 주소를 지정합니다.
+- 채팅은 pushpush 패키지(`newswatcher[chat]`)로 보냅니다. 라우트(봇 + 목적지 —
+  텔레그램·슬랙·디스코드)를 pushpush 자체 CLI(`pushpush --help`)로 한 번 설정한 뒤,
+  `--push ROUTE`(또는 `NEWSWATCHER_DIGEST_PUSH` 설정)로 그 라우트를 지정합니다. 다이제스트는
+  markdown 메시지 한 통으로 전송됩니다.
 
 즉 newswatcher는 자기 비밀을 하나도 갖지 않습니다: LLM 키는 thinchat, 이메일 비번은
 mailmail, 챗 토큰은 pushpush에 — 각 도구를 단독으로 쓸 때와 똑같이 각자 저장소에 있습니다.

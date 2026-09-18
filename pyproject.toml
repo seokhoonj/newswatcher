@@ -29,8 +29,6 @@ dependencies    = [
     "credbox>=0.4.0,<0.5",
     "feedparser>=6.0",
     "lxml>=5.0",
-    "mailmail>=0.4.2",
-    "pushpush>=0.3.1",
     "requests>=2.31",
     "soupsieve>=2.4",
     "thinchat>=0.3.1,<0.4",
@@ -43,7 +41,14 @@ Repository = "https://github.com/seokhoonj/newswatcher"
 Issues     = "https://github.com/seokhoonj/newswatcher/issues"
 
 [project.optional-dependencies]
+# Delivery is opt-in: the core (collect -> summarize -> archive) needs neither. Install the
+# channel you want -- newswatcher[email] for the mailmail email digest, newswatcher[chat] for the
+# pushpush chat digest, or newswatcher[all] for both.
+email = ["mailmail>=0.4.2"]
+chat = ["pushpush>=0.3.1"]
+all = ["newswatcher[email,chat]"]
 dev = [
+    "newswatcher[all]",   # the suite exercises both delivery channels
     "mypy>=1.11",
     "pytest>=8.0",
     "ruff>=0.6",
