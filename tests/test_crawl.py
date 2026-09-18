@@ -5,6 +5,16 @@ from newswatcher.errors import SourceError
 from newswatcher.sources import Source
 
 
+def test_extract_items_keeps_a_malformed_href_without_crashing():
+    # A crawled href with unbalanced IPv6 brackets makes urljoin raise ValueError; the row must
+    # degrade (keep the raw value) rather than crash the whole crawl on one bad link.
+    html = '<ul><li><a class="t" href="http://[::1">Title</a></li></ul>'
+    src = Source("s", kind="crawl", url="http://good.example/list", topics=("t",),
+                 item="li", title="a.t", link="a.t@href")
+    items = extract_items(html, src)
+    assert len(items) == 1 and items[0].title == "Title"
+
+
 def test_extract_missing_selectors_raises_sourceerror():
     # A crawl Source built directly (bypassing add_source validation) with no selectors
     # must fail with the domain error, not an opaque TypeError -- and survive python -O.
