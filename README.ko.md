@@ -50,6 +50,9 @@ newswatcher poll --no-mail
 newswatcher articles
 ```
 
+`articles`에 아무것도 안 나오면 아직 토픽에 맞는 새 기사가 없었던 것뿐입니다 — 오류가 아니라
+정상입니다. `--include` 키워드를 넓히거나 잠시 후 다시 `poll` 하세요.
+
 토픽은 피드의 언어로 매칭하므로 키워드도 피드 언어에 맞춥니다. 한국어 피드에는 한국어
 키워드를, 영어 피드에는 영어 키워드를 씁니다. `newswatcher topics`·`newswatcher sources`로
 등록 내용을 확인합니다.
