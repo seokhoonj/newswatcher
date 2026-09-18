@@ -28,7 +28,7 @@ pip install "newswatcher[chat]"    # + chat digests, via pushpush
 pip install "newswatcher[all]"     # + both
 ```
 
-The Quickstart below emails a digest, so it needs `newswatcher[email]`.
+The Quickstart below needs only the core `newswatcher` — email and chat come later (Delivery).
 
 ## 2. Quickstart
 
@@ -201,7 +201,17 @@ deliberately).
 
 ## 7. Provider keys and model
 
-The LLM provider key is a secret, and it lives with thinchat — the library newswatcher
+A **provider** is the LLM service that writes the summaries. newswatcher supports four; pass the
+name in the left column to `--provider` or `set-key`:
+
+| Provider | Key (environment variable) | Where to get a key |
+|----------|----------------------------|--------------------|
+| `gemini` (default) | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) — free tier |
+| `openai` | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com/api-keys) |
+| `claude` | `CLAUDE_API_KEY` | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| `ollama` | — (runs locally) | no key needed |
+
+The provider key is a secret, and it lives with thinchat — the library newswatcher
 summarizes through — not with newswatcher. Store it once with `setup` (which configures
 email and chat in the same pass) or with `set-key` for the key alone; both prompt without
 echoing and write to thinchat's own credential store:
@@ -211,12 +221,10 @@ newswatcher setup            # the LLM key, plus email and chat, in one pass
 newswatcher set-key gemini   # just the LLM key
 ```
 
-Each key is also read from its standard environment variable (`GEMINI_API_KEY`,
-`OPENAI_API_KEY`, `CLAUDE_API_KEY`), which takes precedence, so a one-off run can supply a
-key without storing anything.
+Each key is also read from its environment variable (the table above), which takes precedence,
+so a one-off run can supply a key without storing anything.
 
-newswatcher summarizes with Gemini's free tier by default — get a free key from
-[Google AI Studio](https://aistudio.google.com/apikey). Choose another provider,
+newswatcher summarizes with Gemini's free tier by default. Choose another provider,
 and optionally a specific model, with `--provider` / `--model`, or persistently
 with the `NEWSWATCHER_LLM_PROVIDER` / `NEWSWATCHER_LLM_MODEL` settings (`llm_provider`
 and `llm_model` in `config.toml`):
@@ -225,18 +233,6 @@ and `llm_model` in `config.toml`):
 newswatcher poll --provider claude --model claude-sonnet-5
 export NEWSWATCHER_LLM_PROVIDER=openai
 ```
-
-### Moving a key from an older newswatcher
-
-Earlier versions kept the LLM key in newswatcher's own `credentials.json`. newswatcher no longer
-reads it; move the key to thinchat's store once (the key names already match), after which the old
-file can be removed:
-
-```sh
-credbox migrate --from-app newswatcher --to-app thinchat --remove-source
-```
-
-`newswatcher setup` prints this command when it finds a key left in the old location.
 
 ## 8. Responsible collection
 
