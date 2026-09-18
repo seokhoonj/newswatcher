@@ -63,7 +63,14 @@ def render_html_digest(stories: tuple[Story, ...], *, heal_notes: tuple[str, ...
     themed ``HTMLLayout`` -- so the digest wears the same house style mailmail gives every
     message. Stories are grouped by topic exactly as ``render_digest``; each entry is the lead's
     linked title, our summary, and the outlets that ran the same story. This is the email path
-    only: chat carries no HTML (the plain-text body holds the same content)."""
+    only: chat carries no HTML (the plain-text body holds the same content).
+
+    Requires the ``newswatcher[email]`` extra (mailmail's ``HTMLLayout``); ``send_digest`` funnels
+    its absence to a ``DigestError``, but a direct caller without mailmail gets an ``ImportError``.
+
+    Raises:
+        ImportError: mailmail (the ``newswatcher[email]`` extra) is not installed.
+    """
     from mailmail import HTMLLayout
 
     layout = HTMLLayout()
@@ -111,7 +118,13 @@ def _is_safe_url(url: str) -> bool:
     feed-supplied ``javascript:`` or ``data:`` URL survives ``html.escape`` (which touches quotes,
     not the scheme) as a live link, so it is the scheme, not the escaping, that has to be checked --
     the same allowlist bleach, sanitize-html, and feedparser apply to a link target."""
-    return urlsplit(url).scheme in ("http", "https")
+    try:
+        return urlsplit(url).scheme in ("http", "https")
+    except ValueError:
+        # urlsplit raises ValueError on a malformed URL (e.g. unbalanced IPv6 brackets, http://[::1);
+        # a link we cannot even parse is not one to vouch for in an href -- treat it as unsafe so the
+        # title renders as plain text, never as an uncaught crash on semi-trusted feed input.
+        return False
 
 
 def send_digest(

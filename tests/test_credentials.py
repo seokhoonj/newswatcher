@@ -190,6 +190,22 @@ def test_email_channel_reports_not_installed(monkeypatch):
     assert "pip install newswatcher[email]" in (email.detail or "")
 
 
+def test_optional_tool_channel_distinguishes_absent_from_broken():
+    # A genuinely-absent package (ModuleNotFoundError naming the package) is NOT_INSTALLED; a broken
+    # install (a missing transitive dep, or any other import failure) is ERROR, so doctor does not
+    # report a broken channel as a healthy opt-out.
+    from newswatcher.credentials import _optional_tool_channel
+
+    absent = ModuleNotFoundError("No module named 'mailmail'", name="mailmail")
+    assert _optional_tool_channel("email", "mailmail", absent).state is ChannelState.NOT_INSTALLED
+
+    broken_subdep = ModuleNotFoundError("No module named 'some_dep'", name="some_dep")
+    assert _optional_tool_channel("email", "mailmail", broken_subdep).state is ChannelState.ERROR
+
+    other_import_error = ImportError("failed during mailmail import")
+    assert _optional_tool_channel("email", "mailmail", other_import_error).state is ChannelState.ERROR
+
+
 def test_chat_channel_reports_not_installed(monkeypatch):
     import sys
 

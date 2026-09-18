@@ -118,6 +118,21 @@ def test_render_html_digest_drops_a_dangerous_link_scheme():
         assert "Click me" in html   # still shown, just not as a link
 
 
+def test_render_html_digest_survives_a_malformed_link_url():
+    # urlsplit raises ValueError on unbalanced IPv6 brackets (http://[::1); the render must not
+    # crash on semi-trusted feed input -- the link is treated as unsafe and the title is plain text.
+    html = digest.render_html_digest((_story("Title", "t", link="http://[::1"),))
+    assert "Title" in html                 # rendered, no crash
+    assert "http://[::1" not in html       # the unparseable URL is not emitted as an href
+
+
+def test_render_html_digest_escapes_quotes_in_title_and_summary():
+    # html.escape(quote=True) also escapes " in element text; pin it for the title and summary
+    # leaves too (not only outlet names / heal notes).
+    html = digest.render_html_digest((_story('a "quoted" title', "t", summary='the "sum"'),))
+    assert "&quot;quoted&quot;" in html and "&quot;sum&quot;" in html
+
+
 def test_render_html_digest_empty_with_heal_notes():
     html = digest.render_html_digest((), heal_notes=("selector fixed",))
     assert "No new articles this run." in html
@@ -249,8 +264,27 @@ def test_send_digest_returns_empty_tuple_when_a_channel_accepts(monkeypatch):
         def send(self, *, subject, body, to, html=None, account=None):
             pass
 
+    class _Push:
+        PushpushError = RuntimeError
+
+        def send(self, text, *, to, markup="plain"):
+            pass
+
     monkeypatch.setattr(digest, "_load_mailmail", lambda: _Mail())
-    assert send_digest((_story("a", "t"),), email_to="you@e.com") == ()
+    monkeypatch.setattr(digest, "_load_pushpush", lambda: _Push())
+    assert send_digest((_story("a", "t"),), email_to="you@e.com") == ()          # email-only
+    assert send_digest((_story("a", "t"),), push_to="alerts") == ()              # chat-only
+    assert send_digest((_story("a", "t"),), email_to="e@x", push_to="a") == ()   # both
+
+
+def test_send_digest_noop_when_stories_present_but_no_destination(monkeypatch):
+    # Stories exist but neither destination is given: nothing is sent, no delivery package loaded,
+    # and the documented empty tuple comes back.
+    called = []
+    monkeypatch.setattr(digest, "_load_mailmail", lambda: called.append(1))
+    monkeypatch.setattr(digest, "_load_pushpush", lambda: called.append(1))
+    assert send_digest((_story("a", "t"),)) == ()
+    assert called == []
 
 
 def test_send_digest_returns_the_email_failure_when_chat_succeeds(monkeypatch):

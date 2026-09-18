@@ -54,7 +54,7 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 | `topics` | List the defined topics with their include / exclude keywords. |
 | `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | Register a source — an RSS feed (`--kind rss`) or a robots-permitted crawl page (`--kind crawl`) — and the `--topic`s to test it against. A crawl source also needs selectors: `--item --title --link` (required), `--date --body-selector` (optional). `--keep-all` keeps every article from the source without keyword filtering (for a trade feed that is wholly on-topic). |
 | `sources` | List the registered sources with their kind, URL, and topics. |
-| `set-key <provider>` | Store an LLM provider's API key with thinchat, prompted without echo (mode 0600). The provider is `gemini`, `openai`, or `claude`; the key is also read from the matching `*_API_KEY` environment variable, which takes precedence. |
+| `set-key <provider>` | Store an LLM provider's API key with thinchat, prompted without echo (in thinchat's own credential store). The provider is `gemini`, `openai`, or `claude`; the key is also read from the matching `*_API_KEY` environment variable, which takes precedence. |
 | `setup [--provider P]` | Fill in the missing secrets for every channel in one guided pass — the LLM key with thinchat, each email password with mailmail, each chat token with pushpush — prompting without echo and printing where each landed. Skips what is already set, and points you at the tool to configure a channel that has no account or route yet. |
 | `doctor [--provider P]` | Show where each secret and config file lives and whether it is set, without printing any secret. Exits non-zero when a configured channel is missing its secret or its store is unreadable, so a scheduled run can gate on a complete setup. |
 | `recent <url> [--limit N]` | Fetch and print a feed's latest items (title + link) without storing or summarizing — a quick check of a URL before you register it. `--limit N` caps how many. |
@@ -189,7 +189,7 @@ deliberately).
 The LLM provider key is a secret, and it lives with thinchat — the library newswatcher
 summarizes through — not with newswatcher. Store it once with `setup` (which configures
 email and chat in the same pass) or with `set-key` for the key alone; both prompt without
-echoing and write to thinchat's store (mode 0600):
+echoing and write to thinchat's own credential store:
 
 ```sh
 newswatcher setup            # the LLM key, plus email and chat, in one pass

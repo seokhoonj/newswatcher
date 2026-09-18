@@ -98,6 +98,42 @@ def test_error_never_carries_the_resolved_key(monkeypatch):
     assert all("file-key" not in text for text in surfaces)
 
 
+def _capture_make_client(monkeypatch):
+    """Stub only ``make_client`` (no network) and capture the api_key handed to it, leaving the
+    real thinchat key resolution in place."""
+    captured: dict[str, object] = {}
+
+    def fake_make_client(provider, *, model, api_key, max_tokens, max_retries):
+        captured["api_key"] = api_key
+        return object()
+
+    monkeypatch.setattr(_llm, "make_client", fake_make_client)
+    return captured
+
+
+def test_make_llm_client_resolves_a_real_stored_key(monkeypatch):
+    # Integration: the REAL thinchat store resolution flows through make_llm_client (not a stubbed
+    # resolver). Store a key with thinchat on the suite's tmp XDG, then confirm it reaches the client.
+    import thinchat
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    thinchat.set_api_key("gemini", value="stored-real-key")
+    captured = _capture_make_client(monkeypatch)
+    _llm.make_llm_client(max_tokens=100, action="summarizing")
+    assert captured["api_key"] == "stored-real-key"
+
+
+def test_make_llm_client_env_key_beats_the_real_store(monkeypatch):
+    # Integration: thinchat's own precedence (env over its store) is honored end to end.
+    import thinchat
+
+    thinchat.set_api_key("gemini", value="stored-real-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "env-wins")
+    captured = _capture_make_client(monkeypatch)
+    _llm.make_llm_client(max_tokens=100, action="summarizing")
+    assert captured["api_key"] == "env-wins"
+
+
 def test_provider_key_name_maps_known_and_keyless():
     assert _llm.provider_key_name("gemini") == "GEMINI_API_KEY"
     assert _llm.provider_key_name("ollama") is None
