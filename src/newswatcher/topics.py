@@ -62,10 +62,14 @@ def add_topic(topic: Topic, path: Path | None = None) -> bool:
     hand-edited file is normalised and a duplicate cannot slip in.
 
     Raises:
-        TopicError: the existing file is malformed or could not be written.
+        TopicError: the name is empty (or only whitespace), or the existing file is
+            malformed or could not be written.
     """
     path = path or topics_path()
     existing = load_topics(path) if path.exists() else ()
+    topic = Topic(topic.name.strip(), includes=topic.includes, excludes=topic.excludes)
+    if not topic.name:
+        raise TopicError("a topic name must not be empty")
     if any(current.name == topic.name for current in existing):
         return False
     write_text_atomic(path, _render((*existing, topic)), TopicError)

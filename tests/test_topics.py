@@ -34,3 +34,11 @@ def test_string_include_is_one_word(tmp_path):
     path = tmp_path / "topics.toml"
     path.write_text('[[topic]]\nname = "x"\nincludes = "solo"\n', encoding="utf-8")
     assert load_topics(path)[0].includes == ("solo",)
+
+
+def test_add_topic_rejects_an_empty_or_whitespace_name(tmp_path):
+    path = tmp_path / "topics.toml"
+    for blank in ("", "   "):
+        with pytest.raises(TopicError):
+            add_topic(Topic(blank), path)
+    assert not path.exists()   # nothing written, so a later load still succeeds
