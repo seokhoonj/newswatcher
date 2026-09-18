@@ -4,8 +4,10 @@
 
 newswatcher watches RSS feeds and robots-permitted listing pages, matches new
 articles against topics you define, summarizes the matches with an LLM, and
-sends one topic-grouped digest by email, chat, or both. Several outlets covering
-the same story collapse into a single entry. The topics are yours to define, so
+sends one topic-grouped digest by email, chat, or both. Delivery is optional — the
+core collects, summarizes, and archives on its own; email and chat are opt-in add-ons
+(`newswatcher[email]` / `newswatcher[chat]`). Several outlets covering the same story
+collapse into a single entry. The topics are yours to define, so
 the same tool tracks a stock ticker, a technology, a policy beat, or any subject
 a feed covers.
 
