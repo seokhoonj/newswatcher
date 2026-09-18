@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import feedparser
 
+from newswatcher.errors import FetchError
 from newswatcher.http import get
 from newswatcher.robots import RobotsGate
 from newswatcher.sources import Source
@@ -54,10 +55,19 @@ def fetch_feed(source: Source, gate: RobotsGate, *,
 
 
 def parse_feed(text: str, source_name: str) -> tuple[FeedItem, ...]:
-    """Parse feed ``text`` into items. Never raises on malformed feeds -- feedparser
-    is tolerant and simply yields the entries it can read; an entry missing a link is
-    skipped (nothing to fetch or dedup on)."""
-    parsed = feedparser.parse(text)
+    """Parse feed ``text`` into items. feedparser is tolerant and simply yields the
+    entries it can read; an entry missing a link is skipped (nothing to fetch or dedup on).
+
+    Raises:
+        FetchError: feedparser itself raised on the text (e.g. a surrogate character
+            reference its charref handler cannot encode). Wrapped so one unparseable feed
+            skips its own source (poll_sources catches FetchError) instead of crashing the
+            whole poll -- the module invariant that one bad source must not stop the rest.
+    """
+    try:
+        parsed = feedparser.parse(text)
+    except Exception as err:   # feedparser can raise (not only set .bozo) on some malformed input
+        raise FetchError(f"could not parse feed for {source_name}: {err}") from err
     items = []
     for entry in parsed.entries:
         link = (entry.get("link") or "").strip()

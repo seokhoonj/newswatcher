@@ -44,3 +44,17 @@ def test_parse_feed_extracts_items():
 def test_parse_feed_missing_pubdate_is_empty_string():
     items = parse_feed(RSS, "보험신보")
     assert items[1].published == ""
+
+
+def test_parse_feed_wraps_a_parser_crash_as_fetcherror():
+    # A surrogate character reference makes feedparser itself raise UnicodeEncodeError;
+    # parse_feed must wrap it in FetchError so one bad feed skips its own source (which
+    # poll_sources catches) instead of crashing the whole poll.
+    import pytest
+
+    from newswatcher.errors import FetchError
+
+    bad = ('<rss version="2.0"><channel><item><title>t</title>'
+           '<link>http://e.com/1</link><guid>x&#xD800;y</guid></item></channel></rss>')
+    with pytest.raises(FetchError):
+        parse_feed(bad, "bad-source")
