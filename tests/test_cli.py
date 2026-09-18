@@ -721,30 +721,30 @@ def test_watch_ends_on_a_corrupt_state_file(monkeypatch, tmp_path):
 def test_resolve_store_body_flag_short_circuits_the_setting(monkeypatch):
     # The --store-body flag wins without even reading the setting, so a broken or garbage
     # setting cannot interfere when the flag is set.
-    monkeypatch.setattr(cli.config, "setting",
+    monkeypatch.setattr("newswatcher.config.setting",
                         lambda name: pytest.fail("setting must not be read when --store-body is set"))
     assert cli._resolve_store_body(argparse.Namespace(store_body=True)) is True
 
 
 def test_resolve_store_body_default_off_when_unset(monkeypatch):
-    monkeypatch.setattr(cli.config, "setting", lambda name: None)
+    monkeypatch.setattr("newswatcher.config.setting", lambda name: None)
     assert cli._resolve_store_body(argparse.Namespace(store_body=False)) is False
 
 
 def test_resolve_store_body_reads_a_truthy_setting(monkeypatch):
     for word in ("1", "true", "TRUE", "  yes ", "on"):
-        monkeypatch.setattr(cli.config, "setting", lambda name, w=word: w)
+        monkeypatch.setattr("newswatcher.config.setting", lambda name, w=word: w)
         assert cli._resolve_store_body(argparse.Namespace(store_body=False)) is True
 
 
 def test_resolve_store_body_reads_a_falsy_setting(monkeypatch):
     for word in ("0", "false", "No", "off"):
-        monkeypatch.setattr(cli.config, "setting", lambda name, w=word: w)
+        monkeypatch.setattr("newswatcher.config.setting", lambda name, w=word: w)
         assert cli._resolve_store_body(argparse.Namespace(store_body=False)) is False
 
 
 def test_resolve_store_body_rejects_an_unrecognized_setting(monkeypatch):
     from newswatcher.errors import ConfigError
-    monkeypatch.setattr(cli.config, "setting", lambda name: "treu")   # typo, not silently off
+    monkeypatch.setattr("newswatcher.config.setting", lambda name: "treu")   # typo, not silently off
     with pytest.raises(ConfigError):
         cli._resolve_store_body(argparse.Namespace(store_body=False))
