@@ -35,7 +35,7 @@ jobs:
         # is also what the README tells a person to run.
         run: |
           uv venv --python ${{ matrix.python-version }}
-          uv pip install -e ".[dev]"
+          uv pip install -e . --group dev
           .venv/bin/python -c "import sys; print('testing on', sys.version)"
 
       - name: Test
