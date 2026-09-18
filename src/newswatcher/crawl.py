@@ -93,5 +93,12 @@ def _select_value(row: Tag, selector: str, source_name: str, *, base: str | None
         if isinstance(raw, list):   # a multi-valued attribute (e.g. class); join it
             raw = " ".join(raw)
         value = (raw or "").strip()
-        return urljoin(base, value) if base and value else value
+        if base and value:
+            try:
+                return urljoin(base, value)
+            except ValueError:
+                # A malformed extracted href (e.g. unbalanced IPv6 brackets) makes urljoin raise;
+                # keep the raw value rather than crash the whole crawl on one bad row.
+                return value
+        return value
     return found.get_text(strip=True)

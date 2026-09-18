@@ -8,6 +8,21 @@ from newswatcher.errors import FetchError
 from newswatcher.robots import RobotsGate
 
 
+def test_get_funnels_a_malformed_url_to_fetcherror():
+    # urlsplit raises ValueError on a malformed URL (unbalanced IPv6 brackets) before any request;
+    # a semi-trusted feed link like this must surface as FetchError, not a raw ValueError that
+    # escapes every NewswatcherError guard and crashes the poll (and kills watch).
+    class _Gate:
+        def can_fetch(self, url):
+            return True
+
+        def throttle(self, url):
+            pass
+
+    with pytest.raises(FetchError):
+        http.get("http://[::1", cast(RobotsGate, _Gate()))
+
+
 class _Resp:
     def __init__(self, status=200, text="body", is_redirect=False, location=None):
         self.status_code = status

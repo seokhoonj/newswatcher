@@ -53,6 +53,12 @@ def get(url: str, gate: RobotsGate, *, session: requests.Session | None = None,
             response = _fetch_gated(http, url, gate, timeout)
     except requests.RequestException as err:
         raise FetchError(f"could not fetch {url}: {err}") from err
+    except ValueError as err:
+        # A malformed URL (from a feed link, a redirect Location, or a crawled href) makes
+        # urlsplit/urljoin raise ValueError ("Invalid IPv6 URL" on unbalanced brackets). It is
+        # semi-trusted input, so funnel it to FetchError rather than let a raw ValueError escape
+        # and crash the whole poll (and kill `watch`) on one bad link.
+        raise FetchError(f"malformed URL {url!r}: {err}") from err
     _fix_charsetless_encoding(response)
     return response.text
 
