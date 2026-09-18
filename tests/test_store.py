@@ -213,3 +213,12 @@ def test_load_reads_a_pre_body_archive_file(tmp_path):
     loaded = store.load()
     assert len(loaded) == 1
     assert loaded[0].guid == "https://e.com/legacy" and loaded[0].summary == "our summary"
+    assert loaded[0].category == ""   # a pre-category file loads with no category
+
+
+def test_save_then_load_preserves_category(tmp_path):
+    store = FileStore(tmp_path)
+    store.save(Article(guid="a1", title="t", link="https://e.com/a1", source_name="s",
+                       published="2026-08-15T00:00:00Z", topics=("insurance",),
+                       summary="요약", summary_model="m", category="규제·자본"))
+    assert store.load()[0].category == "규제·자본"

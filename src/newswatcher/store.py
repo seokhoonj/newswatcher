@@ -32,8 +32,10 @@ class Article:
     """One archived article: metadata and our summary. No body field -- the article
     archive never carries the publisher's text; a fetched body is only optionally captured
     to a separate ``BodyStore``. ``published`` is ISO-8601 (or "") and orders the archive;
-    ``topics`` are the names it was tagged with; ``summary`` is our original text and
-    ``summary_model`` which model wrote it."""
+    ``topics`` are the keyword-filter names it was tagged with; ``summary`` is our original
+    text, ``summary_model`` which model wrote it, and ``category`` the single label the
+    summarizer classified it into ("" when classification is off, or the reply named no
+    known category in the required layout)."""
 
     guid:          str
     title:         str
@@ -43,6 +45,7 @@ class Article:
     topics:        tuple[str, ...]
     summary:       str
     summary_model: str = field(default="")
+    category:      str = field(default="")
 
 
 def archive_root() -> Path:
@@ -222,6 +225,7 @@ def _read_article(path: Path) -> tuple[Article | None, str]:
             source_name=str(body["source_name"]), published=str(body["published"]),
             topics=tuple(str(t) for t in body.get("topics", ())),
             summary=str(body["summary"]), summary_model=str(body.get("summary_model", "")),
+            category=str(body.get("category", "")),
         )
     except (KeyError, TypeError):
         return None, ""

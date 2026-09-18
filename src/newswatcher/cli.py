@@ -1,7 +1,8 @@
 """Command-line entry point.
 
-Subcommands compose the library into user actions: ``add-topic`` / ``topics`` and
-``add-source`` / ``sources`` manage the registries; ``recent`` previews a source
+Subcommands compose the library into user actions: ``add-topic`` / ``topics``,
+``add-category`` / ``categories`` and ``add-source`` / ``sources`` manage the registries;
+``recent`` previews a source
 without storing; ``poll`` runs one collect-summarize-mail pass; ``watch`` repeats it
 on an interval; ``articles`` queries the archive; ``heal`` checks and repairs crawl
 selectors; ``schedule`` registers the cron poll. The CLI is a thin shell -- parse,
@@ -20,6 +21,7 @@ import thinchat
 
 from newswatcher import __version__, config, credentials
 from newswatcher._llm import DEFAULT_PROVIDER, provider_key_name, validate_provider
+from newswatcher.categories import Category, add_category, load_categories
 from newswatcher.credentials import ChannelState
 from newswatcher.digest import send_digest
 from newswatcher.errors import ArchiveError, ConfigError, LLMError, NewswatcherError
@@ -185,6 +187,20 @@ def _run_topics(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_add_category(args: argparse.Namespace) -> int:
+    if add_category(Category(args.name, hint=args.hint)):
+        print(f"added category {args.name!r}")
+    else:
+        print(f"category {args.name!r} already exists")
+    return 0
+
+
+def _run_categories(args: argparse.Namespace) -> int:
+    for category in load_categories():
+        print(f"{category.name}  {category.hint}".rstrip())
+    return 0
+
+
 def _run_add_source(args: argparse.Namespace) -> int:
     source = Source(
         args.name, kind=args.kind, url=args.url, topics=tuple(args.topic),
@@ -239,7 +255,8 @@ def _poll_once(args: argparse.Namespace) -> int:
     provider, model = _resolve_llm_choice(args)
     threshold = _resolve_dedup_threshold()   # validate up-front, before the poll spends the LLM
     keep_days = _resolve_archive_keep_days()   # ditto -- a bad value should not survive a poll
-    summarize = functools.partial(summarize_article, provider=provider, model=model)
+    summarize = functools.partial(summarize_article, provider=provider, model=model,
+                                  categories=load_categories())
     with new_session() as session:   # one pooled connection for every fetch this poll
         report = poll_sources(sources, topics, gate=gate, state=state, store=store,
                               body_store=body_store, session=session, summarize=summarize)
@@ -421,7 +438,7 @@ def _run_doctor(args: argparse.Namespace) -> int:
         if channel.state in (ChannelState.MISSING, ChannelState.ERROR):
             n_unhealthy += 1
     print("config")
-    for name in ("config.toml", "sources.toml", "topics.toml"):
+    for name in ("config.toml", "sources.toml", "topics.toml", "categories.toml"):
         path = config.config_dir() / name
         mark = "present" if path.exists() else "absent"
         print(f"  {name:<26} {mark:<13} {credentials.display_path(path)}")   # width matches the channel rows
@@ -492,6 +509,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     topics = sub.add_parser("topics", help="list topics")
     topics.set_defaults(run=_run_topics)
+
+    add_category_cmd = sub.add_parser("add-category", help="define a classification category")
+    add_category_cmd.add_argument("name")
+    add_category_cmd.add_argument("--hint", default="", metavar="TEXT",
+                                  help="what belongs in this category (guides the LLM's choice)")
+    add_category_cmd.set_defaults(run=_run_add_category)
+
+    categories = sub.add_parser("categories", help="list categories")
+    categories.set_defaults(run=_run_categories)
 
     add_source_cmd = sub.add_parser("add-source", help="register a source")
     add_source_cmd.add_argument("name")

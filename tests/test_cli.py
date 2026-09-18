@@ -563,9 +563,10 @@ def _capture_provider(monkeypatch):
     from newswatcher.summarize import Summary
     captured = {}
 
-    def fake_summarize(item, body, *, provider, model, api_key=None):
+    def fake_summarize(item, body, *, provider, model, api_key=None, categories=()):
         captured["provider"] = provider
         captured["model"] = model
+        captured["categories"] = categories
         return Summary(text="x", model="m")
 
     def fake_poll_sources(*args, **kwargs):
@@ -583,7 +584,7 @@ def test_poll_binds_provider_and_model_from_flags(monkeypatch, tmp_path):
     captured = _capture_provider(monkeypatch)
     assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store",
                      "--provider", "openai", "--model", "gpt-x"]) == 0
-    assert captured == {"provider": "openai", "model": "gpt-x"}
+    assert captured["provider"] == "openai" and captured["model"] == "gpt-x"
 
 
 def test_poll_provider_comes_from_environment_variable(monkeypatch, tmp_path):
@@ -748,3 +749,15 @@ def test_resolve_store_body_rejects_an_unrecognized_setting(monkeypatch):
     monkeypatch.setattr("newswatcher.config.setting", lambda name: "treu")   # typo, not silently off
     with pytest.raises(ConfigError):
         cli._resolve_store_body(argparse.Namespace(store_body=False))
+
+
+def test_poll_binds_configured_categories_to_the_summarizer(monkeypatch, tmp_path):
+    from newswatcher.categories import Category, add_category
+
+    _xdg(monkeypatch, tmp_path)
+    monkeypatch.delenv("NEWSWATCHER_LLM_PROVIDER", raising=False)
+    add_category(Category("규제·자본", hint="K-ICS"))   # written into the isolated config dir
+    add_category(Category("기타"))
+    captured = _capture_provider(monkeypatch)
+    assert cli.main(["poll", "--no-mail", "--no-heal", "--no-store"]) == 0
+    assert [c.name for c in captured["categories"]] == ["규제·자본", "기타"]

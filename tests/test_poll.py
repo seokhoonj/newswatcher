@@ -183,3 +183,21 @@ def test_poll_body_store_failure_does_not_drop_article(tmp_path, monkeypatch):
     assert report.skipped == ()              # a body-capture failure is not a drop
     assert [link for link, _ in report.body_failures] == ["https://e.com/1"]
     assert "disk full" in report.body_failures[0][1]
+
+
+def test_poll_stores_the_summary_category(tmp_path, monkeypatch):
+    import newswatcher.poll as poll
+    from newswatcher.summarize import Summary
+    src = Source("지", kind="rss", url="u", topics=("insurance",), keep_all=True)
+    items = (FeedItem(title="t", link="https://e.com/1", guid="g1",
+                      published="2026-08-15T00:00:00Z", source_name="지"),)
+    monkeypatch.setattr(poll, "_collect", lambda s, g, sess: items)
+    monkeypatch.setattr(poll, "_fetch_body", lambda item, s, g, sess: "본문")
+
+    def summarize(item, body, **k):
+        return Summary(text="요약", model="m", category="규제·자본")
+
+    store = FileStore(tmp_path)
+    poll_sources((src,), (Topic("insurance"),), gate=_gate, state=State(),
+                 store=store, summarize=summarize)
+    assert store.load()[0].category == "규제·자본"

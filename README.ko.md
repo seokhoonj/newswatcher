@@ -69,6 +69,8 @@ newswatcher articles
 |------|---------|
 | `add-topic <name> [--include WORD...] [--exclude WORD...]` | 토픽 필터 정의: 이름 + `--include` 키워드(하나라도 있으면 매칭) + 선택 `--exclude` 키워드(하나라도 있으면 제외). include가 비면 모든 기사 매칭. |
 | `topics` | 정의된 토픽을 include / exclude 키워드와 함께 나열. |
+| `add-category <name> [--hint TEXT]` | 분류 카테고리 정의: 이름 + 무엇이 이 카테고리에 속하는지 설명하는 선택 `--hint`. 요약 시 LLM이 각 기사를 정의된 카테고리 하나로 분류하며, 응답 첫 줄에 정의된 카테고리 이름이 없으면 빈 값으로 저장합니다(`categories.toml` 참고). |
+| `categories` | 정의된 카테고리를 hint와 함께 나열. |
 | `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | 소스 등록 — RSS 피드(`--kind rss`) 또는 robots 허용 크롤 페이지(`--kind crawl`) — 와 테스트할 `--topic`들. crawl 소스는 selector 필요: `--item --title --link`(필수), `--date --body-selector`(선택). `--keep-all`은 키워드 필터 없이 소스의 모든 기사 보관(피드 전체가 온토픽인 전문지용). |
 | `sources` | 등록된 소스를 kind·URL·토픽과 함께 나열. |
 | `set-key <provider>` | LLM provider의 API 키를 에코 없이 입력받아 thinchat 자체 자격증명 저장소에 저장. provider는 `gemini`·`openai`·`claude`; 키는 같은 이름의 `*_API_KEY` 환경 변수에서도 읽으며 그쪽이 우선. |
@@ -157,6 +159,24 @@ excludes = ["연예"]
 [[topic]]
 name = "반도체"
 includes = ["반도체", "파운드리", "HBM", "TSMC", "엔비디아"]
+```
+
+`categories.toml`(선택)에는 분류 라벨을 작성합니다. 파일이 있으면 요약을 쓰는 바로 그
+LLM 호출에서(추가 비용 없이) 각 기사를 카테고리 하나로 분류해(응답 첫 줄에 정의된 카테고리
+이름이 없으면 빈 값) 기사에 저장합니다. 토픽(무엇을
+*보관*할지 정하는 키워드 필터)과 달리 카테고리는 표시용 그룹 라벨이며, 모델이 맥락으로
+고릅니다(그래서 "감독기관이 나눔 행사를 열었다"가 키워드 방식처럼 규제로 오분류되지 않습니다).
+각 항목은 `name`과, 모델을 안내하는 선택 `hint`입니다. 파일이 없으면 분류는 꺼지고 카테고리는
+빈 값이 됩니다.
+
+```toml
+[[category]]
+name = "M&A"
+hint = "인수합병, 매각, 지분·경영권 거래"
+
+[[category]]
+name = "기타"
+hint = "위에 안 맞는 나눔·인사·행사 등 일반"
 ```
 
 `sources.toml`에는 RSS 또는 crawl 소스를 작성합니다. `topics`는 해당 소스에 적용할

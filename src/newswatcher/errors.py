@@ -12,6 +12,7 @@ __all__ = [
     "ConfigError",
     "SourceError",
     "TopicError",
+    "CategoryError",
     "FetchError",
     "ArchiveError",
     "LLMError",
@@ -37,6 +38,10 @@ class SourceError(NewswatcherError):
 
 class TopicError(NewswatcherError):
     """A topic entry is invalid: missing name, or includes/excludes of the wrong shape."""
+
+
+class CategoryError(NewswatcherError):
+    """A category entry is invalid: missing name, or a hint of the wrong shape."""
 
 
 class FetchError(NewswatcherError):

@@ -70,6 +70,8 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 |---------|--------------|
 | `add-topic <name> [--include WORD...] [--exclude WORD...]` | Define a topic filter: a name, `--include` keywords (an article matches when it has any one of them), and optional `--exclude` keywords (any one rejects it). Empty includes match every article. |
 | `topics` | List the defined topics with their include / exclude keywords. |
+| `add-category <name> [--hint TEXT]` | Define a classification category: a name and an optional `--hint` describing what belongs in it. The summarizer asks the model to choose one defined category per article; the stored category is empty unless the reply names a defined category on its own first line (see `categories.toml`). |
+| `categories` | List the defined categories with their hints. |
 | `add-source <name> <url> [--kind rss\|crawl] [--topic NAME]... [--keep-all]` | Register a source — an RSS feed (`--kind rss`) or a robots-permitted crawl page (`--kind crawl`) — and the `--topic`s to test it against. A crawl source also needs selectors: `--item --title --link` (required), `--date --body-selector` (optional). `--keep-all` keeps every article from the source without keyword filtering (for a trade feed that is wholly on-topic). |
 | `sources` | List the registered sources with their kind, URL, and topics. |
 | `set-key <provider>` | Store an LLM provider's API key with thinchat, prompted without echo (in thinchat's own credential store). The provider is `gemini`, `openai`, or `claude`; the key is also read from the matching `*_API_KEY` environment variable, which takes precedence. |
@@ -160,6 +162,26 @@ excludes = ["sports"]
 [[topic]]
 name = "semiconductors"
 includes = ["chip", "foundry", "HBM", "TSMC", "Nvidia"]
+```
+
+`categories.toml` (optional) contains classification labels. When it is present, the
+summarizer -- in the same LLM call that writes the summary, so at no extra cost -- also
+classifies each article into one category by name (empty unless the reply names a defined
+category on its own first line), stored on the article. Unlike a
+topic (a keyword filter deciding what is *kept*), a category is a single label for display
+grouping, chosen by the model from context (so "the regulator held a charity event" is not
+miscategorised as regulation the way a keyword would). Each entry is a `name` and an
+optional `hint` that guides the model. When the file is absent, classification is off and
+the category is empty.
+
+```toml
+[[category]]
+name = "M&A"
+hint = "인수합병, 매각, 지분·경영권 거래"
+
+[[category]]
+name = "기타"
+hint = "위에 안 맞는 나눔·인사·행사 등 일반"
 ```
 
 `sources.toml` contains RSS or crawl sources. `topics` selects the topic filters

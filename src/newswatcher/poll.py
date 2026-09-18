@@ -108,7 +108,7 @@ def _articles_from(
             article = Article(
                 guid=tagged.guid, title=tagged.title, link=tagged.link,
                 source_name=source.name, published=tagged.published, topics=tagged.topics,
-                summary=summary.text, summary_model=summary.model,
+                summary=summary.text, summary_model=summary.model, category=summary.category,
             )
             if store is not None:
                 store.save(article)
