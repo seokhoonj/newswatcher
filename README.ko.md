@@ -2,7 +2,7 @@
 
 [English](README.md) | **한국어**
 
-newswatcher는 RSS 피드와 robots 정책이 허용하는 목록 페이지를 확인하고, 새 기사를
+newswatcher는 RSS 피드와 robots 정책이 허용하는 목록 페이지를 확인하고, 새로운 기사를
 사용자가 정의한 토픽과 매칭한 뒤 LLM으로 요약하여 토픽별 다이제스트 한 통을 이메일이나
 채팅으로 보냅니다. 같은 사건을 여러 매체가 보도하면 한 항목으로 묶습니다. 토픽은 직접
 정의하므로 같은 도구로 종목, 기술, 정책, 그 밖에 피드가 다루는 어떤 주제든 추적할 수
@@ -57,7 +57,7 @@ newswatcher poll
 | `setup [--provider P]` | 각 채널의 빠진 비밀을 한 번의 안내식 패스로 채움 — LLM 키는 thinchat, 이메일 비번은 mailmail, 챗 토큰은 pushpush에. 에코 없이 입력받고 각각 어디에 저장됐는지 출력. 이미 설정된 것은 건너뛰고, 계정·라우트가 아직 없는 채널은 해당 도구로 안내. |
 | `doctor [--provider P]` | 각 비밀과 설정 파일이 어디 있고 설정됐는지를 비밀 값 출력 없이 표시. 설정된 채널에 비밀이 없거나 저장소를 읽을 수 없으면 non-zero로 종료하므로, 예약 실행이 설정 완료 여부를 게이트로 쓸 수 있음. |
 | `recent <url> [--limit N]` | 피드 최신 항목(제목+링크)을 저장·요약 없이 출력 — 등록 전 URL 확인용. `--limit N`으로 개수 제한. |
-| `poll` | 한 번의 패스: 전 소스 fetch → 토픽에 맞는 새 기사만 요약·아카이브 → 다이제스트 발송. `--to`/`--push`=목적지, `--no-mail`=발송 없이 수집만, `--no-store`=아카이브 안 함, `--no-heal`=selector 복구 생략, `--provider`/`--model`=LLM 선택. |
+| `poll` | 한 번의 패스: 전 소스 fetch → 토픽에 맞는 새로운 기사만 요약·아카이브 → 다이제스트 발송. `--to`/`--push`=목적지, `--no-mail`=발송 없이 수집만, `--no-store`=아카이브 안 함, `--no-heal`=selector 복구 생략, `--provider`/`--model`=LLM 선택. |
 | `watch [--every N]` | `poll`을 포그라운드에서 `--every` 분(기본 30)마다 반복, 중단할 때까지. poll의 모든 옵션을 받음. |
 | `articles [--topic NAME] [--since DATE] [--until DATE]` | 아카이브 기사(제목·우리 요약·링크)를 나열, 토픽·반열림 `[since, until)` 날짜 범위로 필터 가능. |
 | `heal [--dry-run] [--provider P] [--model M]` | selector가 끊긴 crawl 소스를 점검해 LLM으로 복구(라이브 페이지로 검증). `--dry-run`은 제안만 보고 쓰지 않음. |
