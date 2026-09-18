@@ -1,5 +1,10 @@
 # newswatcher
 
+[![check](https://github.com/seokhoonj/newswatcher/actions/workflows/check.yml/badge.svg)](https://github.com/seokhoonj/newswatcher/actions/workflows/check.yml)
+[![PyPI](https://img.shields.io/pypi/v/newswatcher)](https://pypi.org/project/newswatcher/)
+[![Python](https://img.shields.io/pypi/pyversions/newswatcher)](https://pypi.org/project/newswatcher/)
+[![License](https://img.shields.io/pypi/l/newswatcher)](https://github.com/seokhoonj/newswatcher/blob/main/LICENSE)
+
 **English** | [한국어](README.ko.md)
 
 newswatcher watches RSS feeds and robots-permitted listing pages, matches new
@@ -11,7 +16,7 @@ collapse into a single entry. The topics are yours to define, so
 the same tool tracks a stock ticker, a technology, a policy beat, or any subject
 a feed covers.
 
-## Install
+## 1. Install
 
 newswatcher requires Python 3.11 or newer. The core — collect, summarize, archive — installs on
 its own; delivery is opt-in, so add the channel you want:
@@ -25,7 +30,7 @@ pip install "newswatcher[all]"     # + both
 
 The Quickstart below emails a digest, so it needs `newswatcher[email]`.
 
-## Quickstart
+## 2. Quickstart
 
 Define a topic, register an RSS source, provide a digest recipient and the API
 key for the default Gemini LLM provider, then run one poll:
@@ -45,7 +50,7 @@ English keywords for an English feed, Korean keywords for a Korean feed.
 Use `newswatcher topics` and `newswatcher sources` to inspect the registries. Run
 `newswatcher --help` or `newswatcher <command> --help` for all commands and options.
 
-## Commands
+## 3. Commands
 
 Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 `newswatcher --version` prints the version.
@@ -66,7 +71,7 @@ Run `newswatcher --help` or `newswatcher <command> --help` for every option;
 | `heal [--dry-run] [--provider P] [--model M]` | Check crawl sources whose selectors stopped matching and repair them with an LLM, validated against the live page. `--dry-run` reports the proposed fix without writing it. |
 | `schedule install\|status\|remove [--every N]` | Install, show, or remove the recurring poll in the OS scheduler (cron on Linux/macOS, schtasks on Windows). `--every N` sets the interval. |
 
-## Delivery
+## 4. Delivery
 
 The digest is sent by email, to a chat channel, or both — set one or both destinations.
 Each channel is an opt-in extra (`newswatcher[email]` / `newswatcher[chat]`); its companion
@@ -87,7 +92,7 @@ with mailmail, the chat token with pushpush — each in its own store, exactly a
 used on its own. Configure them all in one guided pass with `newswatcher setup`, and see the full
 map — what is set and where it lives — with `newswatcher doctor`.
 
-## News feeds
+## 5. News feeds
 
 Any valid RSS/Atom feed works as a source. A representative set of verified
 Korean feeds is below; the full list, grouped by section and marked with which
@@ -124,7 +129,7 @@ topic keywords.
 | The Verge | tech | `https://www.theverge.com/rss/index.xml` |
 | Nature | science | `https://www.nature.com/nature.rss` |
 
-## Configuration files
+## 6. Configuration files
 
 newswatcher stores hand-edited configuration under
 `$XDG_CONFIG_HOME/newswatcher`, or `~/.config/newswatcher` when
@@ -186,7 +191,7 @@ integer) and each poll removes archived articles older than that after the diges
 sent. Leaving it unset keeps everything (this deletion is irreversible, so enable it
 deliberately).
 
-## Provider keys and model
+## 7. Provider keys and model
 
 The LLM provider key is a secret, and it lives with thinchat — the library newswatcher
 summarizes through — not with newswatcher. Store it once with `setup` (which configures
@@ -224,7 +229,7 @@ credbox migrate --from-app newswatcher --to-app thinchat --remove-source
 
 `newswatcher setup` prints this command when it finds a key left in the old location.
 
-## Responsible collection
+## 8. Responsible collection
 
 Every feed, listing-page, and article request is checked against the site's
 robots policy before it is sent, and newswatcher identifies itself with its user
@@ -232,7 +237,7 @@ agent. A disallowed URL is not fetched. The durable archive and outbound digest
 contain the LLM-written summary, source link, and metadata only. Raw article
 bodies are transient summary input and are neither archived nor sent.
 
-## Scheduling
+## 9. Scheduling
 
 Install a recurring poll every 30 minutes:
 
@@ -268,7 +273,7 @@ A poll takes a single-instance lock, so a scheduled poll and a manual one never 
 at once — whichever starts second logs that a poll is already running and exits. The
 lock uses `flock` on Linux and macOS and `msvcrt` on Windows.
 
-## Use it from an AI coding agent
+## 10. Use it from an AI coding agent
 
 This repo ships a `poll` skill: ask in plain words ("run my newswatcher poll", "check the
 news") and it runs one poll and relays what it found.
@@ -307,3 +312,7 @@ ln -s "$PWD/plugins/newswatcher/skills/poll" ~/.codex/skills/poll    # Codex -> 
 ```
 
 Claude Code picks it up immediately; Codex needs a restart to load it.
+
+## 11. License
+
+[MIT](LICENSE)
