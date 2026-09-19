@@ -42,3 +42,20 @@ def test_update_selectors_rewrites_in_place(tmp_path):
     assert src.item == "ul.new li"
     assert src.title == "a.tit"
     assert src.link == "a@href"  # unchanged keys preserved
+
+
+def test_add_source_omits_default_topics_and_keep_all(tmp_path):
+    # An unset topics / keep_all=False source writes only the required fields, matching the
+    # old renderer (the optional lines are left out, not written as empty/false).
+    path = tmp_path / "sources.toml"
+    add_source(Source("s", kind="rss", url="https://e.com"), path)
+    assert path.read_text(encoding="utf-8") == (
+        '[[source]]\nname = "s"\nkind = "rss"\nurl = "https://e.com"\n')
+
+
+def test_add_source_rejects_an_empty_or_whitespace_name(tmp_path):
+    path = tmp_path / "sources.toml"
+    for blank in ("", "   "):
+        with pytest.raises(SourceError):
+            add_source(Source(blank, kind="rss", url="https://e.com"), path)
+    assert not path.exists()   # nothing written, so a later load still succeeds

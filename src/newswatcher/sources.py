@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Literal, get_args
 
 from newswatcher import _toml
-from newswatcher._atomic import write_text_atomic
 from newswatcher.config import config_dir
 from newswatcher.errors import SourceError
 
@@ -81,14 +80,20 @@ def add_source(source: Source, path: Path | None = None) -> bool:
     it was added (False if the name already exists — idempotent).
 
     Raises:
-        SourceError: the new source is invalid, or the file is malformed or unwritable.
+        SourceError: the name is empty (or only whitespace), the new source is invalid, or
+            the file is malformed or unwritable.
     """
     path = path or sources_path()
+    # Store the name stripped, as load and the sibling add_topic/add_category do, so the
+    # stored form matches what a later dedup or selector repair looks it up by.
+    source = replace(source, name=source.name.strip())
+    if not source.name:
+        raise SourceError("a source name must not be empty")
     _validate(source)
     existing = load_sources(path) if path.exists() else ()
     if any(current.name == source.name for current in existing):
         return False
-    write_text_atomic(path, _render((*existing, source)), SourceError)
+    _toml.append_entry(path, "source", _fields(source), SourceError)
     return True
 
 
@@ -104,16 +109,14 @@ def update_selectors(name: str, selectors: dict[str, str], path: Path | None = N
     unknown = set(selectors) - set(_SOURCE_SELECTOR_FIELDS)
     if unknown:
         raise SourceError(f"not selector fields: {', '.join(sorted(unknown))}")
-    sources = load_sources(path)
-    if not any(s.name == name for s in sources):
+    if not any(s.name == name for s in load_sources(path)):
         raise SourceError(f"no source named {name!r} to update")
-    updated = tuple(
-        # keys are validated above to be selector fields, all typed str | None, so the
-        # str values are valid -- but mypy cannot see the guard, hence the narrow ignore.
-        replace(s, **selectors) if s.name == name else s  # type: ignore[arg-type]
-        for s in sources
-    )
-    write_text_atomic(path, _render(updated), SourceError)
+    # On-disk field order is immaterial (the reader parses by name, not position), and the
+    # healer only ever repairs selectors that are already present, so no re-ordering is needed.
+    fields: list[_toml.TOMLField] = [
+        (field_name, value) for field_name, value in selectors.items()]
+    _toml.update_entry(path, "source", match_field="name", match_value=name,
+                       fields=fields, error_cls=SourceError)
 
 
 def _source_from(entry: dict[str, object], path: Path) -> Source:
@@ -176,22 +179,21 @@ def _opt_str(raw: object) -> str | None:
     return raw.strip()
 
 
-def _render(sources: tuple[Source, ...]) -> str:
-    blocks = []
-    for s in sources:
-        lines = [
-            "[[source]]",
-            f"name = {_toml.quote(s.name)}",
-            f"kind = {_toml.quote(s.kind)}",
-            f"url = {_toml.quote(s.url)}",
-        ]
-        if s.topics:
-            lines.append(f"topics = {_toml.array(s.topics)}")
-        if s.keep_all:
-            lines.append("keep_all = true")
-        for field_name in _SOURCE_SELECTOR_FIELDS:
-            value = getattr(s, field_name)
-            if value is not None:
-                lines.append(f"{field_name} = {_toml.quote(value)}")
-        blocks.append("\n".join(lines))
-    return "\n\n".join(blocks) + "\n"
+def _fields(source: Source) -> list[_toml.TOMLField]:
+    """The ``[[source]]`` fields to write, in render order: the required ``name`` / ``kind`` /
+    ``url``, then ``topics`` and ``keep_all`` (only when set), then whichever crawl selectors
+    are present. An omitted optional field falls back to its default on read."""
+    fields: list[_toml.TOMLField] = [
+        ("name", source.name),
+        ("kind", source.kind),
+        ("url", source.url),
+    ]
+    if source.topics:
+        fields.append(("topics", source.topics))
+    if source.keep_all:
+        fields.append(("keep_all", True))
+    for field_name in _SOURCE_SELECTOR_FIELDS:
+        value = getattr(source, field_name)
+        if value is not None:
+            fields.append((field_name, value))
+    return fields

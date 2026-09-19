@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 
 [project]
 name            = "newswatcher"
-version         = "0.3.0"
+version         = "0.4.0"
 description     = "Collect topic-matched articles from RSS and robots-permitted crawl sources, summarize them, and mail a digest."
 readme          = "README.md"
 license         = "MIT"
@@ -37,6 +37,7 @@ dependencies    = [
     "requests>=2.31",
     "soupsieve>=2.4",
     "thinchat>=0.3.1,<0.4",
+    "tomlite>=0.1.1,<0.2",
     "trafilatura>=1.8",
 ]
 

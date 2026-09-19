@@ -147,7 +147,8 @@ topic keywords.
 newswatcher stores hand-edited configuration under
 `$XDG_CONFIG_HOME/newswatcher`, or `~/.config/newswatcher` when
 `XDG_CONFIG_HOME` is unset. The CLI writes the same files, so CLI and manual
-configuration can be mixed.
+configuration can be mixed: a CLI write appends or edits in place, leaving any
+comments and formatting you added by hand intact.
 
 `topics.toml` contains topic filters. An article matches when its title or feed
 summary contains any include keyword and no exclude keyword. An empty

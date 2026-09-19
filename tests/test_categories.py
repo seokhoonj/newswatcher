@@ -69,3 +69,10 @@ def test_add_category_rejects_an_empty_or_whitespace_name(tmp_path):
         with pytest.raises(CategoryError):
             add_category(Category(blank), path)
     assert not path.exists()   # nothing written, so a later load still succeeds
+
+
+def test_add_category_omits_an_empty_hint(tmp_path):
+    # A hintless category writes just the name line, matching the old renderer.
+    path = tmp_path / "categories.toml"
+    add_category(Category("기타"), path)
+    assert path.read_text(encoding="utf-8") == '[[category]]\nname = "기타"\n'

@@ -144,7 +144,8 @@ mailmail, 챗 토큰은 pushpush에 — 각 도구를 단독으로 쓸 때와 �
 
 newswatcher는 직접 편집하는 설정을 `$XDG_CONFIG_HOME/newswatcher`에 저장합니다.
 `XDG_CONFIG_HOME`이 없으면 `~/.config/newswatcher`를 사용합니다. CLI도 같은 파일을
-쓰므로 CLI 등록과 직접 편집을 함께 사용할 수 있습니다.
+쓰므로 CLI 등록과 직접 편집을 함께 사용할 수 있습니다. CLI는 항목을 덧붙이거나
+제자리에서 고칠 뿐이라, 손으로 넣은 주석과 서식은 그대로 보존됩니다.
 
 `topics.toml`에는 토픽 필터를 작성합니다. 기사 제목이나 피드 요약에 include 키워드가
 하나라도 있고 exclude 키워드는 하나도 없을 때 매칭됩니다. `includes`가 비어 있으면

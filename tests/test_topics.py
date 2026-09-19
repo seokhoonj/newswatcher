@@ -42,3 +42,11 @@ def test_add_topic_rejects_an_empty_or_whitespace_name(tmp_path):
         with pytest.raises(TopicError):
             add_topic(Topic(blank), path)
     assert not path.exists()   # nothing written, so a later load still succeeds
+
+
+def test_add_topic_writes_the_preserved_block_format(tmp_path):
+    # The appended block is byte-identical to what the old whole-file renderer produced:
+    # name, then a non-empty includes as an inline array; non-ASCII kept verbatim.
+    path = tmp_path / "topics.toml"
+    add_topic(Topic("보험", includes=("a", "b")), path)
+    assert path.read_text(encoding="utf-8") == '[[topic]]\nname = "보험"\nincludes = ["a", "b"]\n'

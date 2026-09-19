@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from newswatcher import _toml
-from newswatcher._atomic import write_text_atomic
 from newswatcher.config import config_dir
 from newswatcher.errors import TopicError
 
@@ -58,8 +57,9 @@ def load_topics(path: Path | None = None) -> tuple[Topic, ...]:
 def add_topic(topic: Topic, path: Path | None = None) -> bool:
     """Append ``topic`` to ``topics.toml``, creating the file if absent; return
     whether it was added (False if the name already exists — a no-op, so ``add-topic``
-    is idempotent). The file is rewritten from the parsed-and-appended list so a
-    hand-edited file is normalised and a duplicate cannot slip in.
+    is idempotent). Only a new block is added; existing entries, comments and layout are
+    left intact. The existing file is parsed first (which rejects a malformed one) so a
+    duplicate cannot slip in.
 
     Raises:
         TopicError: the name is empty (or only whitespace), or the existing file is
@@ -72,7 +72,7 @@ def add_topic(topic: Topic, path: Path | None = None) -> bool:
         raise TopicError("a topic name must not be empty")
     if any(current.name == topic.name for current in existing):
         return False
-    write_text_atomic(path, _render((*existing, topic)), TopicError)
+    _toml.append_entry(path, "topic", _fields(topic), TopicError)
     return True
 
 
@@ -97,13 +97,12 @@ def _keywords(raw: object, field_name: str, name: object) -> tuple[str, ...]:
     return tuple(str(word) for word in raw)
 
 
-def _render(topics: tuple[Topic, ...]) -> str:
-    blocks = []
-    for topic in topics:
-        lines = ["[[topic]]", f"name = {_toml.quote(topic.name)}"]
-        if topic.includes:
-            lines.append(f"includes = {_toml.array(topic.includes)}")
-        if topic.excludes:
-            lines.append(f"excludes = {_toml.array(topic.excludes)}")
-        blocks.append("\n".join(lines))
-    return "\n\n".join(blocks) + "\n"
+def _fields(topic: Topic) -> list[_toml.TOMLField]:
+    """The ``[[topic]]`` fields to write, in render order: ``name``, then ``includes`` /
+    ``excludes`` only when non-empty (an empty list is left out, matching the default)."""
+    fields: list[_toml.TOMLField] = [("name", topic.name)]
+    if topic.includes:
+        fields.append(("includes", topic.includes))
+    if topic.excludes:
+        fields.append(("excludes", topic.excludes))
+    return fields

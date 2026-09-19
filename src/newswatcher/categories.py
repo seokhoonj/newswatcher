@@ -14,7 +14,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from newswatcher import _toml
-from newswatcher._atomic import write_text_atomic
 from newswatcher.config import config_dir
 from newswatcher.errors import CategoryError
 
@@ -79,7 +78,7 @@ def add_category(category: Category, path: Path | None = None) -> bool:
     normalized = category.name.lower()
     if any(current.name.lower() == normalized for current in existing):
         return False
-    write_text_atomic(path, _render((*existing, category)), CategoryError)
+    _toml.append_entry(path, "category", _fields(category), CategoryError)
     return True
 
 
@@ -110,11 +109,9 @@ def _category_from(entry: dict[str, object], path: Path) -> Category:
     return Category(name.strip(), hint=hint.strip())
 
 
-def _render(categories: tuple[Category, ...]) -> str:
-    blocks = []
-    for category in categories:
-        lines = ["[[category]]", f"name = {_toml.quote(category.name)}"]
-        if category.hint:
-            lines.append(f"hint = {_toml.quote(category.hint)}")
-        blocks.append("\n".join(lines))
-    return "\n\n".join(blocks) + "\n"
+def _fields(category: Category) -> list[_toml.TOMLField]:
+    """The ``[[category]]`` fields to write: ``name``, then ``hint`` only when non-empty."""
+    fields: list[_toml.TOMLField] = [("name", category.name)]
+    if category.hint:
+        fields.append(("hint", category.hint))
+    return fields
