@@ -7,7 +7,7 @@ build-backend = "hatchling.build"
 
 [project]
 name            = "newswatcher"
-version         = "0.4.0"
+version         = "0.4.1"
 description     = "Collect topic-matched articles from RSS and robots-permitted crawl sources, summarize them, and mail a digest."
 readme          = "README.md"
 license         = "MIT"
@@ -31,13 +31,13 @@ classifiers     = [
 requires-python = ">=3.11"
 dependencies    = [
     "beautifulsoup4>=4.12",
-    "credbox>=0.4.0,<0.5",
+    "credbox>=0.4.0",
     "feedparser>=6.0",
     "lxml>=5.0",
     "requests>=2.31",
     "soupsieve>=2.4",
-    "thinchat>=0.3.1,<0.4",
-    "tomlite>=0.1.1,<0.2",
+    "thinchat>=0.3.1",
+    "tomlite>=0.1.1",
     "trafilatura>=1.8",
 ]
 
