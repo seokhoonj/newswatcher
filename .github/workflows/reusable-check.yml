@@ -38,45 +38,10 @@ jobs:
           uv pip install -e . --group dev
           .venv/bin/python -c "import sys; print('testing on', sys.version)"
 
-      - name: Test
-        run: .venv/bin/pytest -q
-
-      - name: Lint
-        run: .venv/bin/ruff check src tests
-
-      - name: Types
-        run: .venv/bin/mypy
-
-      - name: Confirm the package imports with only its declared dependencies
-        # newswatcher pulls in third-party runtime deps (feedparser, bs4, requests, ...).
-        # Installed into a bare environment with nothing but those declared deps, it must
-        # import and its CLI must run -- so an import the pyproject forgot to declare
-        # fails here rather than in a user's fresh install.
-        run: |
-          uv venv /tmp/bare --python ${{ matrix.python-version }}
-          uv pip install --python /tmp/bare/bin/python .
-          /tmp/bare/bin/python -c "import newswatcher; print('newswatcher', newswatcher.__version__, 'imports')"
-          /tmp/bare/bin/newswatcher --help > /dev/null
-
-      - name: Confirm the console script installed
-        # pyproject declares a `newswatcher` entry point; a wheel that dropped it would
-        # leave the skill and the docs pointing at a command that is not there.
-        run: |
-          uv venv /tmp/cli --python ${{ matrix.python-version }}
-          uv pip install --python /tmp/cli/bin/python .
-          /tmp/cli/bin/newswatcher --version
-
-      - name: Confirm py.typed ships in the built package
-        # The hints are invisible to a user's type checker unless py.typed rides along
-        # (PEP 561), and the source cannot answer whether the wheel kept it: the file can
-        # sit in git while the build omits it. Install the built package and look for it.
-        run: |
-          uv venv /tmp/typed --python ${{ matrix.python-version }}
-          uv pip install --python /tmp/typed/bin/python .
-          /tmp/typed/bin/python -c "
-          import importlib.util, pathlib
-          spec = importlib.util.find_spec('newswatcher')
-          root = pathlib.Path(spec.origin).parent
-          assert (root / 'py.typed').is_file(), 'py.typed missing from the installed package'
-          print('py.typed ships alongside newswatcher')
-          "
+      - name: Check (tests, lint, types, and packaging assertions)
+        # `make ci` is the SINGLE SOURCE OF TRUTH for what "the gate" is -- the exact target
+        # a developer runs locally before pushing, so a green run there is a green run here.
+        # It runs tests / lint / types in the dev venv (.venv, from Install above) and the
+        # packaging assertions -- import with only declared deps, the console script, and
+        # py.typed shipping (PEP 561) -- against a bare install built on this matrix's Python.
+        run: make ci PYTHON=${{ matrix.python-version }}
